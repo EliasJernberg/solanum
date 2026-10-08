@@ -98,5 +98,41 @@ template $SolanumPreferencesWindow : Adw.PreferencesWindow {
         }
       }
     }
+
+    Adw.PreferencesGroup {
+      title: _("Rain Sound");
+
+      Adw.SwitchRow rain_sound_switch {
+        title: _("Rain Sound Audible");
+      }
+
+      Adw.ActionRow rain_sound_file_row {
+        title: _("Sound File");
+        use-markup: false;
+
+        [suffix]
+        Gtk.Button rain_sound_choose_button {
+          label: _("Choose…");
+          valign: center;
+        }
+
+        [suffix]
+        Gtk.Button rain_sound_reset_button {
+          label: _("Reset");
+          valign: center;
+        }
+      }
+
+      Adw.SpinRow rain_volume_spin {
+        title: _("Volume (%)");
+        numeric: true;
+        adjustment: Gtk.Adjustment {
+          lower: 0;
+          upper: 100;
+          step-increment: 5;
+          page-increment: 10;
+        };
+      }
+    }
   }
 }

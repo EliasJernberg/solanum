@@ -42,5 +42,18 @@
       <default>''</default>
       <summary>Path to the image seen through the rain. Empty means the built-in image.</summary>
     </key>
+    <key name="rain-sound" type="b">
+      <default>false</default>
+      <summary>Whether the rain sound is audible. It loops, muted otherwise, for as long as the window is open.</summary>
+    </key>
+    <key name="rain-sound-file" type="s">
+      <default>''</default>
+      <summary>Path to the audio file played as the rain sound. Empty means no rain sound.</summary>
+    </key>
+    <key name="rain-volume" type="u">
+      <range min="0" max="100"/>
+      <default>60</default>
+      <summary>The volume of the rain sound in percent.</summary>
+    </key>
   </schema>
 </schemalist>

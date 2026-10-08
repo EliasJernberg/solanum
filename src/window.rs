@@ -17,6 +17,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use gst::prelude::*;
+use gstreamer as gst;
 use gtk::gdk;
 use gtk::gio;
 use gtk::glib;
@@ -136,6 +138,21 @@ static RAIN_HTML: &str = r##"<!DOCTYPE html>
 </html>
 "##;
 
+// The looping rain sound: a playbin3 playing the chosen file and the watch on
+// its bus. Dropping it stops the sound.
+#[derive(Debug)]
+pub struct RainSound {
+    playbin: gst::Element,
+    path: String,
+    _bus_watch: gst::bus::BusWatchGuard,
+}
+
+impl Drop for RainSound {
+    fn drop(&mut self) {
+        let _ = self.playbin.set_state(gst::State::Null);
+    }
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Enum)]
 #[enum_type(name = "SolanumLapType")]
 pub enum LapType {
@@ -169,6 +186,8 @@ mod imp {
         #[template_child]
         pub timer_button: TemplateChild<gtk::Button>,
         #[template_child]
+        pub sound_button: TemplateChild<gtk::ToggleButton>,
+        #[template_child]
         pub menu_button: TemplateChild<gtk::MenuButton>,
         #[template_child]
         pub large_text_bp: TemplateChild<libadwaita::Breakpoint>,
@@ -176,6 +195,7 @@ mod imp {
         pub rain_box: TemplateChild<gtk::Box>,
         pub rain_view: RefCell<Option<webkit6::WebView>>,
         pub rain_session: OnceCell<webkit6::NetworkSession>,
+        pub rain_sound: RefCell<Option<RainSound>>,
     }
 
     #[glib::object_subclass]
@@ -194,11 +214,13 @@ mod imp {
                 timer_label: TemplateChild::default(),
                 today_label: TemplateChild::default(),
                 timer_button: TemplateChild::default(),
+                sound_button: TemplateChild::default(),
                 menu_button: TemplateChild::default(),
                 large_text_bp: TemplateChild::default(),
                 rain_box: TemplateChild::default(),
                 rain_view: RefCell::new(None),
                 rain_session: OnceCell::new(),
+                rain_sound: RefCell::new(None),
             }
         }
 
@@ -223,6 +245,10 @@ mod imp {
 
             klass.install_action("win.previous-background", None, move |win, _, _| {
                 win.cycle_background(-1);
+            });
+
+            klass.install_action("win.toggle-rain-sound", None, move |win, _, _| {
+                win.toggle_rain_sound();
             });
 
             klass.install_action("win.skip", None, move |win, _, _| {
@@ -277,6 +303,11 @@ mod imp {
                     today_label.add_css_class("heading");
                 }
             ));
+        }
+
+        fn dispose(&self) {
+            // A closed window is a quiet window.
+            self.rain_sound.take();
         }
     }
 
@@ -342,6 +373,7 @@ impl SolanumWindow {
         );
 
         self.setup_rain();
+        self.setup_rain_sound();
 
         let min = settings.uint("lap-length");
         imp.timer.set_duration(min);
@@ -684,6 +716,253 @@ impl SolanumWindow {
                 None
             }
         }
+    }
+
+    fn setup_rain_sound(&self) {
+        let imp = self.imp();
+        let app = self.application();
+        let settings = app.gsettings();
+
+        let button = &*imp.sound_button;
+        settings.bind("rain-sound", button, "active").build();
+        button.connect_toggled(Self::update_sound_button);
+        Self::update_sound_button(button);
+
+        settings.connect_changed(
+            Some("rain-sound-file"),
+            clone!(
+                #[weak(rename_to = win)]
+                self,
+                move |_, _| {
+                    win.update_rain_sound();
+                }
+            ),
+        );
+
+        settings.connect_changed(
+            Some("rain-sound"),
+            clone!(
+                #[weak(rename_to = win)]
+                self,
+                move |_, _| {
+                    win.update_rain_mute();
+                }
+            ),
+        );
+
+        settings.connect_changed(
+            Some("rain-volume"),
+            clone!(
+                #[weak(rename_to = win)]
+                self,
+                move |settings, _| {
+                    if let Some(sound) = win.imp().rain_sound.borrow().as_ref() {
+                        sound
+                            .playbin
+                            .set_property("volume", Self::rain_volume(settings));
+                    };
+                }
+            ),
+        );
+
+        self.update_rain_sound();
+    }
+
+    fn update_sound_button(button: &gtk::ToggleButton) {
+        button.set_icon_name(if button.is_active() {
+            "audio-volume-high-symbolic"
+        } else {
+            "audio-volume-muted-symbolic"
+        });
+    }
+
+    fn toggle_rain_sound(&self) {
+        let app = self.application();
+        let settings = app.gsettings();
+        let _ = settings.set_boolean("rain-sound", !settings.boolean("rain-sound"));
+    }
+
+    fn rain_volume(settings: &gio::Settings) -> f64 {
+        f64::from(settings.uint("rain-volume").min(100)) / 100.0
+    }
+
+    // The rain sound plays for as long as the window is open whenever a file
+    // is chosen, and rain-sound only mutes and unmutes it, so turning it on
+    // carries on where the rain is rather than starting the file over.
+    // Choosing another file starts that one from the beginning.
+    fn update_rain_sound(&self) {
+        let imp = self.imp();
+        let app = self.application();
+        let settings = app.gsettings();
+
+        let path = settings.string("rain-sound-file");
+
+        if let Some(sound) = imp.rain_sound.borrow().as_ref() {
+            if sound.path == path.as_str() {
+                return;
+            }
+        }
+
+        imp.rain_sound.take();
+
+        if path.is_empty() {
+            self.update_rain_mute();
+            return;
+        }
+
+        let muted = !settings.boolean("rain-sound");
+        match self.start_rain_sound(&path, Self::rain_volume(settings), muted) {
+            Ok(sound) => {
+                imp.rain_sound.replace(Some(sound));
+            }
+            Err(err) => {
+                eprintln!("Could not play the rain sound \"{}\": {}", path, err);
+                self.rain_sound_failed(None);
+            }
+        }
+    }
+
+    fn update_rain_mute(&self) {
+        let imp = self.imp();
+        let app = self.application();
+        let audible = app.gsettings().boolean("rain-sound");
+
+        if let Some(sound) = imp.rain_sound.borrow().as_ref() {
+            sound.playbin.set_property("mute", !audible);
+            return;
+        }
+
+        // Nothing to hear without a file that plays.
+        if audible {
+            self.rain_sound_failed(None);
+        }
+    }
+
+    fn start_rain_sound(&self, path: &str, volume: f64, muted: bool) -> Result<RainSound, String> {
+        std::fs::File::open(path).map_err(|err| err.to_string())?;
+        let uri = glib::filename_to_uri(path, None).map_err(|err| err.to_string())?;
+
+        let playbin = gst::ElementFactory::make("playbin3")
+            .build()
+            .map_err(|err| err.to_string())?;
+        // Audio only, so a file with cover art never opens a video window.
+        playbin.set_property_from_str("flags", "audio");
+        playbin.set_property("uri", &uri);
+
+        // Play through PulseAudio (or PipeWire's server for it), whose
+        // streams take volume and mute themselves: playbin3 hands both to
+        // the sink, so muting and unmuting is heard at once rather than
+        // after the audio already buffered. The small buffer keeps the
+        // rest of the way short too. Without state.restore-props the
+        // session manager would remember the volume and mute of our stream
+        // for the application and apply them to the chime as well.
+        match gst::ElementFactory::make("pulsesink")
+            .property("buffer-time", 50_000i64)
+            .property("latency-time", 10_000i64)
+            .property(
+                "stream-properties",
+                gst::Structure::builder("props")
+                    .field("state.restore-props", "false")
+                    .build(),
+            )
+            .build()
+        {
+            Ok(sink) => playbin.set_property("audio-sink", &sink),
+            Err(err) => eprintln!(
+                "No pulsesink for the rain sound, using the default: {}",
+                err
+            ),
+        }
+        playbin.set_property("volume", volume);
+        playbin.set_property("mute", muted);
+
+        // Queue the same file again shortly before it ends. playbin3 then
+        // moves on to it without a gap, so the rain loops seamlessly.
+        let next_uri = uri.to_string();
+        playbin.connect("about-to-finish", false, move |args| {
+            if let Ok(playbin) = args[0].get::<gst::Element>() {
+                playbin.set_property("uri", &next_uri);
+            }
+            None
+        });
+
+        let bus = playbin
+            .bus()
+            .ok_or_else(|| "playbin3 has no bus".to_owned())?;
+        let bus_watch = bus
+            .add_watch_local(clone!(
+                #[weak(rename_to = win)]
+                self,
+                #[weak]
+                playbin,
+                #[upgrade_or]
+                glib::ControlFlow::Break,
+                move |_, msg| {
+                    match msg.view() {
+                        gst::MessageView::Error(err) => {
+                            eprintln!(
+                                "Rain sound error from {}: {} ({})",
+                                err.src()
+                                    .map(|src| src.path_string().to_string())
+                                    .unwrap_or_default(),
+                                err.error(),
+                                err.debug().unwrap_or_default()
+                            );
+                            win.rain_sound_failed(Some(&playbin));
+                        }
+                        gst::MessageView::Eos(_) => {
+                            // Not expected with the file queued again above,
+                            // but keep the rain going if it happens.
+                            let _ = playbin.seek_simple(
+                                gst::SeekFlags::FLUSH | gst::SeekFlags::KEY_UNIT,
+                                gst::ClockTime::ZERO,
+                            );
+                        }
+                        _ => (),
+                    }
+                    glib::ControlFlow::Continue
+                }
+            ))
+            .map_err(|err| err.to_string())?;
+
+        let sound = RainSound {
+            playbin,
+            path: path.to_owned(),
+            _bus_watch: bus_watch,
+        };
+        sound
+            .playbin
+            .set_state(gst::State::Playing)
+            .map_err(|err| err.to_string())?;
+
+        Ok(sound)
+    }
+
+    // The rain sound cannot be played: drop the player that failed, if any,
+    // and turn the setting off so the button does not look active for
+    // nothing. Done from an idle callback, since this runs inside a handler
+    // for the same setting or inside the bus watch of the player.
+    fn rain_sound_failed(&self, playbin: Option<&gst::Element>) {
+        let settings = self.application().gsettings().clone();
+        let failed = playbin.map(|playbin| playbin.downgrade());
+        glib::idle_add_local_once(clone!(
+            #[weak(rename_to = win)]
+            self,
+            move || {
+                let imp = win.imp();
+                if let Some(failed) = failed.and_then(|failed| failed.upgrade()) {
+                    let current = imp
+                        .rain_sound
+                        .borrow()
+                        .as_ref()
+                        .is_some_and(|sound| sound.playbin == failed);
+                    if current {
+                        imp.rain_sound.take();
+                    }
+                }
+                let _ = settings.set_boolean("rain-sound", false);
+            }
+        ));
     }
 
     // The images in a folder, sorted by name.

@@ -287,3 +287,32 @@ msgstr "Inbyggd"
 #: src/preferences_window.rs:160
 msgid "Images"
 msgstr "Bilder"
+
+#: data/ui/window.blp:71 data/ui/preferences-window.blp:103
+msgid "Rain Sound"
+msgstr "Regnljud"
+
+#: data/gtk/help-overlay.blp:26
+msgctxt "shortcut window"
+msgid "Rain Sound"
+msgstr "Regnljud"
+
+#: data/ui/preferences-window.blp:106
+msgid "Rain Sound Audible"
+msgstr "Regnljud hörbart"
+
+#: data/ui/preferences-window.blp:110 src/preferences_window.rs:262
+msgid "Sound File"
+msgstr "Ljudfil"
+
+#: data/ui/preferences-window.blp:127
+msgid "Volume (%)"
+msgstr "Volym (%)"
+
+#: src/preferences_window.rs:161
+msgid "None"
+msgstr "Ingen"
+
+#: src/preferences_window.rs:256
+msgid "Audio"
+msgstr "Ljud"

@@ -157,6 +157,14 @@ impl SolanumApplication {
                     let _ = win.activate_action("win.previous-background", None);
                 })
                 .build(),
+            // Likewise for the rain sound, e.g. from a keybinding outside the
+            // app: `gapplication action org.gnome.Solanum toggle-rain-sound`.
+            gio::ActionEntryBuilder::new("toggle-rain-sound")
+                .activate(|app: &Self, _, _| {
+                    let win: gtk::Widget = app.get_main_window().upcast();
+                    let _ = win.activate_action("win.toggle-rain-sound", None);
+                })
+                .build(),
         ];
 
         self.add_action_entries(actions);
@@ -168,6 +176,7 @@ impl SolanumApplication {
         self.set_accels_for_action("app.quit", &["<Primary>q"]);
         self.set_accels_for_action("win.next-background", &["<Primary>Right"]);
         self.set_accels_for_action("win.previous-background", &["<Primary>Left"]);
+        self.set_accels_for_action("win.toggle-rain-sound", &["<Primary>r"]);
     }
 
     // About dialog

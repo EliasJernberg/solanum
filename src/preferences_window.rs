@@ -54,6 +54,16 @@ mod imp {
         pub rain_image_choose_button: TemplateChild<gtk::Button>,
         #[template_child]
         pub rain_image_reset_button: TemplateChild<gtk::Button>,
+        #[template_child]
+        pub rain_sound_switch: TemplateChild<libadwaita::SwitchRow>,
+        #[template_child]
+        pub rain_sound_file_row: TemplateChild<libadwaita::ActionRow>,
+        #[template_child]
+        pub rain_sound_choose_button: TemplateChild<gtk::Button>,
+        #[template_child]
+        pub rain_sound_reset_button: TemplateChild<gtk::Button>,
+        #[template_child]
+        pub rain_volume_spin: TemplateChild<libadwaita::SpinRow>,
         pub settings: OnceCell<gio::Settings>,
     }
 
@@ -132,6 +142,27 @@ impl SolanumPreferencesWindow {
             })
             .build();
 
+        settings
+            .bind("rain-sound", &*imp.rain_sound_switch, "active")
+            .build();
+        settings
+            .bind("rain-volume", &*imp.rain_volume_spin, "value")
+            .build();
+
+        // Show which sound file is in use: its file name, or "None".
+        settings
+            .bind("rain-sound-file", &*imp.rain_sound_file_row, "subtitle")
+            .get_only()
+            .mapping(|variant, _| {
+                let path = variant.str().unwrap_or_default();
+                let subtitle = Path::new(path)
+                    .file_name()
+                    .map(|name| name.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| i18n("None"));
+                Some(subtitle.to_value())
+            })
+            .build();
+
         let _ = imp.settings.set(settings.clone());
 
         imp.rain_image_choose_button.connect_clicked(glib::clone!(
@@ -148,6 +179,24 @@ impl SolanumPreferencesWindow {
             move |_| {
                 if let Some(settings) = obj.imp().settings.get() {
                     let _ = settings.set_string("rain-image", "");
+                }
+            }
+        ));
+
+        imp.rain_sound_choose_button.connect_clicked(glib::clone!(
+            #[weak]
+            obj,
+            move |_| {
+                obj.choose_rain_sound();
+            }
+        ));
+
+        imp.rain_sound_reset_button.connect_clicked(glib::clone!(
+            #[weak]
+            obj,
+            move |_| {
+                if let Some(settings) = obj.imp().settings.get() {
+                    let _ = settings.set_string("rain-sound-file", "");
                 }
             }
         ));
@@ -196,6 +245,57 @@ impl SolanumPreferencesWindow {
                     };
                     if let Some(settings) = obj.imp().settings.get() {
                         let _ = settings.set_string("rain-image", &path.to_string_lossy());
+                    }
+                }
+            ),
+        );
+    }
+
+    fn choose_rain_sound(&self) {
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some(&i18n("Audio")));
+        filter.add_mime_type("audio/*");
+        let filters = gio::ListStore::new::<gtk::FileFilter>();
+        filters.append(&filter);
+
+        let dialog = gtk::FileDialog::builder()
+            .title(i18n("Sound File"))
+            .modal(true)
+            .filters(&filters)
+            .default_filter(&filter)
+            .build();
+
+        // Start in the folder of the current file, or else in
+        // $XDG_DATA_HOME/solanum/sounds, whichever exists first.
+        let current = self
+            .imp()
+            .settings
+            .get()
+            .map(|settings| settings.string("rain-sound-file").to_string())
+            .unwrap_or_default();
+        let folders = [
+            Path::new(&current).parent().map(Path::to_path_buf),
+            Some(glib::user_data_dir().join("solanum").join("sounds")),
+        ];
+        if let Some(folder) = folders.into_iter().flatten().find(|dir| dir.is_dir()) {
+            dialog.set_initial_folder(Some(&gio::File::for_path(&folder)));
+        }
+
+        dialog.open(
+            Some(self),
+            None::<&gio::Cancellable>,
+            glib::clone!(
+                #[weak(rename_to = obj)]
+                self,
+                move |result| {
+                    let Ok(file) = result else {
+                        return;
+                    };
+                    let Some(path) = file.path() else {
+                        return;
+                    };
+                    if let Some(settings) = obj.imp().settings.get() {
+                        let _ = settings.set_string("rain-sound-file", &path.to_string_lossy());
                     }
                 }
             ),
