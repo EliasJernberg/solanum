@@ -17,9 +17,11 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use gtk::gdk;
 use gtk::gio;
 use gtk::glib;
 use gtk::prelude::*;
+use webkit6::prelude::*;
 
 use glib::{clone, Enum};
 use gtk::CompositeTemplate;
@@ -30,7 +32,8 @@ use gtk::prelude::IsA;
 use gtk::subclass::prelude::*;
 use libadwaita::subclass::prelude::*;
 
-use std::cell::Cell;
+use std::cell::{Cell, OnceCell, RefCell};
+use std::path::{Path, PathBuf};
 
 use crate::app::SolanumApplication;
 use crate::config;
@@ -39,6 +42,99 @@ use crate::timer::Timer;
 
 static CHIME_URI: &str = "resource:///org/gnome/Solanum/chime.ogg";
 static BEEP_URI: &str = "resource:///org/gnome/Solanum/beep.ogg";
+
+static RAIN_SCRIPT_PATH: &str = "/org/gnome/Solanum/rain/raindrop-fx.js";
+static RAIN_IMAGE_PATH: &str = "/org/gnome/Solanum/rain/background.jpg";
+
+// File types picked up when cycling through the background images in a folder.
+static BACKGROUND_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp"];
+
+// The rain page: raindrop-fx (https://github.com/SardineFish/raindrop-fx, MIT)
+// renders drops running down a pane of glass in WebGL, with the background
+// image blurred behind it. @SCRIPT@ and @BACKGROUND@ are filled in at runtime;
+// the image is passed as a data: URI so WebGL can use it as a texture without
+// any file access from the page.
+static RAIN_HTML: &str = r##"<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  #canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  /* Darken the scene so the timer stays readable, a little more in the
+     middle where the labels are. This is done here rather than with a
+     text-shadow in GTK, which would be re-rendered on every frame of the
+     rain and triple the CPU time of the window. */
+  #shade {
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse 50% 40% at 50% 50%, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.35));
+  }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="shade"></div>
+<script>@SCRIPT@</script>
+<script>
+  (() => {
+    const canvas = document.querySelector("#canvas");
+    let raindropFx = null;
+    let ready = false;
+
+    const resize = () => {
+      if (!ready)
+        return;
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width >= 1 && rect.height >= 1)
+        raindropFx.resize(rect.width, rect.height);
+    };
+
+    // raindrop-fx advances the rain by a fixed 0.03 s per animation frame,
+    // which ties its speed to the refresh rate of the monitor. Drive it here
+    // instead: at most about 60 updates per second, each scaled by the time
+    // since the last one, so it falls as it does at 60 Hz on any monitor
+    // and does not burn GPU and CPU time on frames nobody needs.
+    const frameMs = 1000 / 60;
+    let last = 0;
+    const tick = (now) => {
+      requestAnimationFrame(tick);
+      const elapsed = now - last;
+      if (elapsed < frameMs - 3)
+        return;
+      last = now;
+      const dt = Math.min(0.03 * elapsed / frameMs, 0.06);
+      raindropFx.update({ dt: dt, total: now / 1000 });
+    };
+
+    // The view may not have been allocated yet when the page loads, and the
+    // simulation is set up for the canvas size it starts with, so wait for
+    // a real size first.
+    const boot = () => {
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width < 1 || rect.height < 1) {
+        setTimeout(boot, 100);
+        return;
+      }
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+      raindropFx = new RaindropFX({ canvas: canvas, background: "@BACKGROUND@" });
+      // start() loads the textures and then begins its own frame loop,
+      // which is swapped for the one above.
+      raindropFx.start().then(() => {
+        raindropFx.stop();
+        ready = true;
+        resize();
+        requestAnimationFrame(tick);
+      });
+    };
+
+    window.onresize = resize;
+    boot();
+  })();
+</script>
+</body>
+</html>
+"##;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Enum)]
 #[enum_type(name = "SolanumLapType")]
@@ -76,6 +172,10 @@ mod imp {
         pub menu_button: TemplateChild<gtk::MenuButton>,
         #[template_child]
         pub large_text_bp: TemplateChild<libadwaita::Breakpoint>,
+        #[template_child]
+        pub rain_box: TemplateChild<gtk::Box>,
+        pub rain_view: RefCell<Option<webkit6::WebView>>,
+        pub rain_session: OnceCell<webkit6::NetworkSession>,
     }
 
     #[glib::object_subclass]
@@ -96,6 +196,9 @@ mod imp {
                 timer_button: TemplateChild::default(),
                 menu_button: TemplateChild::default(),
                 large_text_bp: TemplateChild::default(),
+                rain_box: TemplateChild::default(),
+                rain_view: RefCell::new(None),
+                rain_session: OnceCell::new(),
             }
         }
 
@@ -112,6 +215,14 @@ mod imp {
 
             klass.install_action("win.reset-today", None, move |win, _, _| {
                 win.reset_today();
+            });
+
+            klass.install_action("win.next-background", None, move |win, _, _| {
+                win.cycle_background(1);
+            });
+
+            klass.install_action("win.previous-background", None, move |win, _, _| {
+                win.cycle_background(-1);
             });
 
             klass.install_action("win.skip", None, move |win, _, _| {
@@ -229,6 +340,8 @@ impl SolanumWindow {
                 }
             ),
         );
+
+        self.setup_rain();
 
         let min = settings.uint("lap-length");
         imp.timer.set_duration(min);
@@ -453,6 +566,177 @@ impl SolanumWindow {
         } else {
             imp.today_label.remove_css_class("success");
         }
+    }
+
+    fn setup_rain(&self) {
+        let app = self.application();
+        let settings = app.gsettings();
+
+        for key in ["rain-background", "rain-image"] {
+            settings.connect_changed(
+                Some(key),
+                clone!(
+                    #[weak(rename_to = win)]
+                    self,
+                    move |_, _| {
+                        win.update_rain();
+                    }
+                ),
+            );
+        }
+
+        self.update_rain();
+    }
+
+    // Drop the current rain view, if any, and build a new one when the rain
+    // background is enabled. Without it the window looks as it always did.
+    fn update_rain(&self) {
+        let imp = self.imp();
+
+        if let Some(view) = imp.rain_view.take() {
+            imp.rain_box.remove(&view);
+        }
+
+        let app = self.application();
+        let settings = app.gsettings();
+        if !settings.boolean("rain-background") {
+            return;
+        }
+
+        let Some(html) = Self::rain_html(&settings.string("rain-image")) else {
+            return;
+        };
+
+        let web_settings = webkit6::Settings::new();
+        web_settings.set_enable_webgl(true);
+        web_settings
+            .set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
+
+        // An ephemeral session keeps WebKit from writing caches and storage
+        // next to our own data in $XDG_DATA_HOME/solanum.
+        let session = imp
+            .rain_session
+            .get_or_init(webkit6::NetworkSession::new_ephemeral);
+
+        let view = webkit6::WebView::builder()
+            .network_session(session)
+            .settings(&web_settings)
+            .hexpand(true)
+            .vexpand(true)
+            .build();
+        // The view is only decoration: clicks and keys belong to the timer.
+        view.set_can_focus(false);
+        view.set_can_target(false);
+        // Black instead of a white flash until the page has painted.
+        view.set_background_color(&gdk::RGBA::BLACK);
+        view.load_html(&html, None);
+
+        imp.rain_box.append(&view);
+        imp.rain_view.replace(Some(view));
+    }
+
+    fn rain_html(image_path: &str) -> Option<String> {
+        let script =
+            match gio::resources_lookup_data(RAIN_SCRIPT_PATH, gio::ResourceLookupFlags::NONE) {
+                Ok(bytes) => bytes,
+                Err(err) => {
+                    glib::g_warning!("solanum", "Could not load the rain script: {}", err);
+                    return None;
+                }
+            };
+        let script = String::from_utf8_lossy(&script);
+
+        let (image, mime) = Self::rain_image(image_path)?;
+        let background = format!("data:{};base64,{}", mime, glib::base64_encode(&image));
+
+        Some(
+            RAIN_HTML
+                .replace("@BACKGROUND@", &background)
+                .replace("@SCRIPT@", &script),
+        )
+    }
+
+    // The image seen through the rain: the file in rain-image when it can be
+    // read, otherwise the built-in one.
+    fn rain_image(path: &str) -> Option<(Vec<u8>, String)> {
+        if !path.is_empty() {
+            match std::fs::read(path) {
+                Ok(data) => {
+                    let (content_type, _) = gio::content_type_guess(Some(path), &data);
+                    let mime = gio::content_type_get_mime_type(&content_type)
+                        .map(|m| m.to_string())
+                        .unwrap_or_default();
+                    if mime.starts_with("image/") {
+                        return Some((data, mime));
+                    }
+                    glib::g_warning!("solanum", "{} is not an image ({})", path, mime);
+                }
+                Err(err) => {
+                    glib::g_warning!("solanum", "Could not read {}: {}", path, err);
+                }
+            }
+        }
+
+        match gio::resources_lookup_data(RAIN_IMAGE_PATH, gio::ResourceLookupFlags::NONE) {
+            Ok(bytes) => Some((bytes.to_vec(), "image/jpeg".to_owned())),
+            Err(err) => {
+                glib::g_warning!("solanum", "Could not load the rain image: {}", err);
+                None
+            }
+        }
+    }
+
+    // The images in a folder, sorted by name.
+    fn backgrounds_in(dir: &Path) -> Vec<PathBuf> {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return Vec::new();
+        };
+
+        let mut files: Vec<PathBuf> = entries
+            .filter_map(|entry| entry.ok())
+            .map(|entry| entry.path())
+            .filter(|path| {
+                path.is_file()
+                    && path
+                        .extension()
+                        .and_then(|ext| ext.to_str())
+                        .is_some_and(|ext| {
+                            BACKGROUND_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str())
+                        })
+            })
+            .collect();
+        files.sort();
+        files
+    }
+
+    // Step to the next (1) or previous (-1) image in the folder of the current
+    // background, wrapping around. With the built-in image the folder is
+    // $XDG_DATA_HOME/solanum/backgrounds.
+    fn cycle_background(&self, step: isize) {
+        let app = self.application();
+        let settings = app.gsettings();
+        let current = PathBuf::from(settings.string("rain-image").as_str());
+
+        let dir = if current.as_os_str().is_empty() {
+            glib::user_data_dir().join("solanum").join("backgrounds")
+        } else {
+            match current.parent() {
+                Some(dir) => dir.to_path_buf(),
+                None => return,
+            }
+        };
+
+        let files = Self::backgrounds_in(&dir);
+        if files.is_empty() {
+            return;
+        }
+
+        let index = match files.iter().position(|file| *file == current) {
+            Some(i) => (i as isize + step).rem_euclid(files.len() as isize) as usize,
+            None => 0,
+        };
+
+        let _ = settings.set_string("rain-image", &files[index].to_string_lossy());
     }
 
     fn update_lap_label(&self) {

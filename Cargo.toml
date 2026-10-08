@@ -9,10 +9,12 @@ glib-macros = "0.19"
 gstreamer = "0.23"
 gstreamer-play = "0.23"
 libadwaita = { version = "0.7", features = ["v1_5"] }
+webkit6 = "0.4"
 
 [dependencies.gtk]
 version = "0.9"
 package ="gtk4"
+features = ["v4_10"]
 
 [dependencies.gettext-rs]
 version = "0.7.0"

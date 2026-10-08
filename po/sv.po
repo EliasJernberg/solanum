@@ -236,3 +236,54 @@ msgstr "Varv per dag"
 #: src/window.rs:430
 msgid "Today {}/{}"
 msgstr "Idag {}/{}"
+
+#: data/ui/window.blp:99
+msgid "Next Background"
+msgstr "Nästa bakgrund"
+
+#: data/ui/window.blp:100
+msgid "Previous Background"
+msgstr "Föregående bakgrund"
+
+#: data/gtk/help-overlay.blp:32
+msgctxt "shortcut window"
+msgid "Rain Background"
+msgstr "Regnbakgrund"
+
+#: data/gtk/help-overlay.blp:35
+msgctxt "shortcut window"
+msgid "Next Background"
+msgstr "Nästa bakgrund"
+
+#: data/gtk/help-overlay.blp:40
+msgctxt "shortcut window"
+msgid "Previous Background"
+msgstr "Föregående bakgrund"
+
+#: data/ui/preferences-window.blp:77
+msgid "Rain Background"
+msgstr "Regnbakgrund"
+
+#: data/ui/preferences-window.blp:80
+msgid "Show Rain Background"
+msgstr "Visa regnbakgrund"
+
+#: data/ui/preferences-window.blp:84 src/preferences_window.rs:168
+msgid "Background Image"
+msgstr "Bakgrundsbild"
+
+#: data/ui/preferences-window.blp:90
+msgid "Choose…"
+msgstr "Välj…"
+
+#: data/ui/preferences-window.blp:96
+msgid "Reset"
+msgstr "Återställ"
+
+#: src/preferences_window.rs:130
+msgid "Built-in"
+msgstr "Inbyggd"
+
+#: src/preferences_window.rs:160
+msgid "Images"
+msgstr "Bilder"

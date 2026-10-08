@@ -27,5 +27,19 @@ Gtk.ShortcutsWindow help_overlay {
         action-name: "app.quit";
       }
     }
+
+    Gtk.ShortcutsGroup {
+      title: C_("shortcut window", "Rain Background");
+
+      Gtk.ShortcutsShortcut {
+        title: C_("shortcut window", "Next Background");
+        action-name: "win.next-background";
+      }
+
+      Gtk.ShortcutsShortcut {
+        title: C_("shortcut window", "Previous Background");
+        action-name: "win.previous-background";
+      }
+    }
   }
 }

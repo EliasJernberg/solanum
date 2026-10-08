@@ -7,6 +7,8 @@
     <file>gtk/help-overlay.ui</file>
     <file alias="chime.ogg">sounds/org.gnome.Solanum-chime.ogg</file>
     <file alias="beep.ogg">sounds/org.gnome.Solanum-beep.ogg</file>
+    <file compressed="true">rain/raindrop-fx.js</file>
+    <file>rain/background.jpg</file>
     <file alias="@APP_ID@.appdata.xml">@APP_ID@.metainfo.xml</file>
   </gresource>
 </gresources>

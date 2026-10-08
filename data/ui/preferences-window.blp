@@ -72,5 +72,31 @@ template $SolanumPreferencesWindow : Adw.PreferencesWindow {
         title: _("Fullscreen During Breaks");
       }
     }
+
+    Adw.PreferencesGroup {
+      title: _("Rain Background");
+
+      Adw.SwitchRow rain_switch {
+        title: _("Show Rain Background");
+      }
+
+      Adw.ActionRow rain_image_row {
+        title: _("Background Image");
+        use-markup: false;
+        sensitive: bind rain_switch.active;
+
+        [suffix]
+        Gtk.Button rain_image_choose_button {
+          label: _("Choose…");
+          valign: center;
+        }
+
+        [suffix]
+        Gtk.Button rain_image_reset_button {
+          label: _("Reset");
+          valign: center;
+        }
+      }
+    }
   }
 }

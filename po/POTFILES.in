@@ -5,4 +5,5 @@ data/gtk/help-overlay.blp
 data/ui/preferences-window.blp
 data/ui/window.blp
 src/app.rs
+src/preferences_window.rs
 src/window.rs

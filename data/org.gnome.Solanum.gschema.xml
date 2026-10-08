@@ -34,5 +34,13 @@
       <default>false</default>
       <summary>Whether the window should fullscreen during breaks.</summary>
     </key>
+    <key name="rain-background" type="b">
+      <default>true</default>
+      <summary>Whether to show animated raindrops on glass behind the timer.</summary>
+    </key>
+    <key name="rain-image" type="s">
+      <default>''</default>
+      <summary>Path to the image seen through the rain. Empty means the built-in image.</summary>
+    </key>
   </schema>
 </schemalist>

@@ -32,6 +32,16 @@ use crate::app::SolanumApplication;
 
 // Entry point for the application
 fn main() -> glib::ExitCode {
+    // The rain background is a WebKit view whose frames arrive as dmabufs.
+    // GTK's default Vulkan renderer cannot import them on every driver (on
+    // NVIDIA it rejects WebKit's XR24 buffers) and then copies each frame
+    // through the CPU, which costs more than a full core. The GL renderer
+    // imports them directly. Set before anything else runs, and only when
+    // the user has not chosen a renderer.
+    if std::env::var_os("GSK_RENDERER").is_none() {
+        std::env::set_var("GSK_RENDERER", "gl");
+    }
+
     // Initiialize gstreamer
     gstreamer::init().expect("Failed to initialize gstreamer");
 

@@ -143,6 +143,20 @@ impl SolanumApplication {
                     let _ = win.activate_action("win.skip", None);
                 })
                 .build(),
+            // Forwarded so the background can be switched from outside the
+            // window too, e.g. `gapplication action org.gnome.Solanum next-background`.
+            gio::ActionEntryBuilder::new("next-background")
+                .activate(|app: &Self, _, _| {
+                    let win: gtk::Widget = app.get_main_window().upcast();
+                    let _ = win.activate_action("win.next-background", None);
+                })
+                .build(),
+            gio::ActionEntryBuilder::new("previous-background")
+                .activate(|app: &Self, _, _| {
+                    let win: gtk::Widget = app.get_main_window().upcast();
+                    let _ = win.activate_action("win.previous-background", None);
+                })
+                .build(),
         ];
 
         self.add_action_entries(actions);
@@ -152,6 +166,8 @@ impl SolanumApplication {
     fn setup_accels(&self) {
         self.set_accels_for_action("app.preferences", &["<Primary>comma"]);
         self.set_accels_for_action("app.quit", &["<Primary>q"]);
+        self.set_accels_for_action("win.next-background", &["<Primary>Right"]);
+        self.set_accels_for_action("win.previous-background", &["<Primary>Left"]);
     }
 
     // About dialog

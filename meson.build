@@ -12,6 +12,7 @@ dependency('gstreamer-base-1.0', version: '>= 1.20')
 dependency('gstreamer-audio-1.0', version: '>= 1.20')
 dependency('gstreamer-play-1.0', version: '>= 1.20')
 dependency('gstreamer-plugins-base-1.0', version: '>= 1.20')
+dependency('webkitgtk-6.0', version: '>= 2.40')
 
 i18n = import('i18n')
 gnome = import('gnome')
