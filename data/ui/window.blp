@@ -27,6 +27,10 @@ template $SolanumWindow : Adw.ApplicationWindow {
         styles ["timer-label", "accent", "blinking"]
       }
 
+      Gtk.Label today_label {
+        styles ["heading", "dim-label"]
+      }
+
       Gtk.CenterBox {
         margin-bottom: 48;
         halign: center;
@@ -76,6 +80,7 @@ template $SolanumWindow : Adw.ApplicationWindow {
 menu app_menu {
   section {
     item (_("Reset Sessions"), "win.reset")
+    item (_("Reset Today's Count"), "win.reset-today")
   }
 
   section {

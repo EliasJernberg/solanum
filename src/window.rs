@@ -69,6 +69,8 @@ mod imp {
         #[template_child]
         pub timer_label: TemplateChild<gtk::Label>,
         #[template_child]
+        pub today_label: TemplateChild<gtk::Label>,
+        #[template_child]
         pub timer_button: TemplateChild<gtk::Button>,
         #[template_child]
         pub menu_button: TemplateChild<gtk::MenuButton>,
@@ -90,6 +92,7 @@ mod imp {
                 lap_type: Default::default(),
                 lap_label: TemplateChild::default(),
                 timer_label: TemplateChild::default(),
+                today_label: TemplateChild::default(),
                 timer_button: TemplateChild::default(),
                 menu_button: TemplateChild::default(),
                 large_text_bp: TemplateChild::default(),
@@ -105,6 +108,10 @@ mod imp {
 
             klass.install_action("win.reset", None, move |win, _, _| {
                 win.reset();
+            });
+
+            klass.install_action("win.reset-today", None, move |win, _, _| {
+                win.reset_today();
             });
 
             klass.install_action("win.skip", None, move |win, _, _| {
@@ -127,15 +134,20 @@ mod imp {
 
             let timer_label = &*self.timer_label;
             let lap_label = &*self.lap_label;
+            let today_label = &*self.today_label;
             self.large_text_bp.connect_apply(clone!(
                 #[weak]
                 timer_label,
                 #[weak]
                 lap_label,
+                #[weak]
+                today_label,
                 move |_| {
                     timer_label.add_css_class("large-timer");
                     lap_label.remove_css_class("heading");
                     lap_label.add_css_class("title-4");
+                    today_label.remove_css_class("heading");
+                    today_label.add_css_class("title-4");
                 }
             ));
 
@@ -144,10 +156,14 @@ mod imp {
                 timer_label,
                 #[weak]
                 lap_label,
+                #[weak]
+                today_label,
                 move |_| {
                     timer_label.remove_css_class("large-timer");
                     lap_label.remove_css_class("title-4");
                     lap_label.add_css_class("heading");
+                    today_label.remove_css_class("title-4");
+                    today_label.add_css_class("heading");
                 }
             ));
         }
@@ -201,6 +217,18 @@ impl SolanumWindow {
         }
 
         self.update_lap_label();
+        self.update_today_label();
+
+        settings.connect_changed(
+            Some("daily-goal"),
+            clone!(
+                #[weak(rename_to = win)]
+                self,
+                move |_, _| {
+                    win.update_today_label();
+                }
+            ),
+        );
 
         let min = settings.uint("lap-length");
         imp.timer.set_duration(min);
@@ -218,6 +246,11 @@ impl SolanumWindow {
             #[weak(rename_to = win)]
             self,
             move |_| {
+                // Only a work lap that ran out on the clock counts towards the
+                // daily goal; skipping a lap does not.
+                if win.imp().lap_type.get() == LapType::Pomodoro {
+                    win.record_completed_lap();
+                }
                 win.toggle_timer();
                 win.next_lap(true);
             }
@@ -362,6 +395,64 @@ impl SolanumWindow {
             app.send_notification(Some("timer-notif"), &notif);
         }
         self.play_sound(CHIME_URI);
+    }
+
+    // Today's date as YYYY-MM-DD, the key the daily count is stored under.
+    fn today() -> String {
+        glib::DateTime::now_local()
+            .ok()
+            .and_then(|dt| dt.format("%Y-%m-%d").ok())
+            .map(|s| s.to_string())
+            .unwrap_or_default()
+    }
+
+    // Work laps completed today. A count stored under another date is stale
+    // and reads as zero, so the counter starts over every day on its own.
+    fn laps_today(&self) -> u32 {
+        let app = self.application();
+        let settings = app.gsettings();
+        if settings.string("laps-date").as_str() == Self::today() {
+            settings.uint("laps-today")
+        } else {
+            0
+        }
+    }
+
+    fn record_completed_lap(&self) {
+        let count = self.laps_today() + 1;
+        let app = self.application();
+        let settings = app.gsettings();
+        let _ = settings.set_string("laps-date", &Self::today());
+        let _ = settings.set_uint("laps-today", count);
+        self.update_today_label();
+    }
+
+    fn reset_today(&self) {
+        let app = self.application();
+        let settings = app.gsettings();
+        let _ = settings.set_string("laps-date", &Self::today());
+        let _ = settings.set_uint("laps-today", 0);
+        self.update_today_label();
+    }
+
+    fn update_today_label(&self) {
+        let imp = self.imp();
+        let app = self.application();
+        let goal = app.gsettings().uint("daily-goal");
+        let done = self.laps_today();
+
+        // Translators: {} are the work laps completed today and the daily
+        // goal, e.g. "Today 3/10".
+        imp.today_label.set_label(&i18n_f(
+            "Today {}/{}",
+            &[&done.to_string(), &goal.to_string()],
+        ));
+
+        if done >= goal {
+            imp.today_label.add_css_class("success");
+        } else {
+            imp.today_label.remove_css_class("success");
+        }
     }
 
     fn update_lap_label(&self) {

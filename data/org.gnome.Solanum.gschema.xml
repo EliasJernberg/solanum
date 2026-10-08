@@ -17,6 +17,19 @@
       <default>4</default>
       <summary>The number of sessions until a long break.</summary>
     </key>
+    <key name="daily-goal" type="u">
+      <range min="1" max="99"/>
+      <default>10</default>
+      <summary>The number of work laps to aim for per day.</summary>
+    </key>
+    <key name="laps-today" type="u">
+      <default>0</default>
+      <summary>Work laps completed on the day stored in laps-date.</summary>
+    </key>
+    <key name="laps-date" type="s">
+      <default>''</default>
+      <summary>The date (YYYY-MM-DD) that laps-today refers to.</summary>
+    </key>
     <key name="fullscreen-break" type="b">
       <default>false</default>
       <summary>Whether the window should fullscreen during breaks.</summary>

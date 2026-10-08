@@ -216,3 +216,23 @@ msgid "Lap {}"
 msgid_plural "Lap {}"
 msgstr[0] "Varv {}"
 msgstr[1] "Varv {}"
+
+#: data/ui/window.blp:79
+msgid "Reset Today's Count"
+msgstr "Nollställ dagens räkning"
+
+#: data/ui/preferences-window.blp:57
+msgid "Daily Goal"
+msgstr "Dagsmål"
+
+#: data/ui/preferences-window.blp:58
+msgid "Completed laps are counted per day and shown under the timer."
+msgstr "Avklarade varv räknas per dag och visas under klockan."
+
+#: data/ui/preferences-window.blp:61
+msgid "Laps per Day"
+msgstr "Varv per dag"
+
+#: src/window.rs:430
+msgid "Today {}/{}"
+msgstr "Idag {}/{}"

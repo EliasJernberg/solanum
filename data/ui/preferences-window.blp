@@ -53,6 +53,21 @@ template $SolanumPreferencesWindow : Adw.PreferencesWindow {
     }
 
     Adw.PreferencesGroup {
+      title: _("Daily Goal");
+      description: _("Completed laps are counted per day and shown under the timer.");
+
+      Adw.SpinRow daily_goal_spin {
+        title: _("Laps per Day");
+        numeric: true;
+        adjustment: Gtk.Adjustment {
+          lower: bind adjustment.lower;
+          upper: bind adjustment.upper;
+          step-increment: bind adjustment.step-increment;
+        };
+      }
+    }
+
+    Adw.PreferencesGroup {
       Adw.SwitchRow fullscreen_switch {
         title: _("Fullscreen During Breaks");
       }

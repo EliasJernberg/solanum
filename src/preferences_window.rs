@@ -40,6 +40,8 @@ mod imp {
         #[template_child]
         pub session_count_spin: TemplateChild<libadwaita::SpinRow>,
         #[template_child]
+        pub daily_goal_spin: TemplateChild<libadwaita::SpinRow>,
+        #[template_child]
         pub fullscreen_switch: TemplateChild<libadwaita::SwitchRow>,
         pub settings: OnceCell<gio::Settings>,
     }
@@ -94,6 +96,9 @@ impl SolanumPreferencesWindow {
                 &*imp.session_count_spin,
                 "value",
             )
+            .build();
+        settings
+            .bind("daily-goal", &*imp.daily_goal_spin, "value")
             .build();
         settings
             .bind("fullscreen-break", &*imp.fullscreen_switch, "active")
