@@ -91,11 +91,13 @@ static RAIN_HTML: &str = r##"<!DOCTYPE html>
         raindropFx.resize(rect.width, rect.height);
     };
 
-    // raindrop-fx advances the rain by a fixed 0.03 s per animation frame,
-    // which ties its speed to the refresh rate of the monitor. Drive it here
-    // instead: at most about 60 updates per second, each scaled by the time
-    // since the last one, so it falls as it does at 60 Hz on any monitor
-    // and does not burn GPU and CPU time on frames nobody needs.
+    // raindrop-fx's own frame loop is stopped below and the rain is driven
+    // from here: at most about 60 updates per second, each advancing the
+    // simulation by the real time since the last one. The rain then falls
+    // in real time on any monitor (upstream steps a fixed 0.03 s per frame,
+    // 1.8x real time at 60 Hz) and does not burn GPU and CPU time on frames
+    // nobody needs. The step is capped so the rain does not jump ahead
+    // after the page has been hidden.
     const frameMs = 1000 / 60;
     let last = 0;
     const tick = (now) => {
@@ -104,7 +106,7 @@ static RAIN_HTML: &str = r##"<!DOCTYPE html>
       if (elapsed < frameMs - 3)
         return;
       last = now;
-      const dt = Math.min(0.03 * elapsed / frameMs, 0.06);
+      const dt = Math.min(elapsed / 1000, 0.1);
       raindropFx.update({ dt: dt, total: now / 1000 });
     };
 
@@ -258,6 +260,24 @@ mod imp {
                     win.present();
                 }
             });
+
+            // Resizes the window from outside (the content size, as with
+            // default-width and default-height), for desktops whose window
+            // manager cannot: WSLg windows on Windows ignore resizes from the
+            // Windows side. GTK only resizes a mapped window when the default
+            // size changes, and resizes by the compositor (such as a snap) do
+            // not update it, so go through an unset size first, or asking for
+            // the same size twice would do nothing.
+            klass.install_action(
+                "win.set-size",
+                Some(glib::VariantTy::new("(ii)").unwrap()),
+                move |win, _, param| {
+                    if let Some((width, height)) = param.and_then(|p| p.get::<(i32, i32)>()) {
+                        win.set_default_size(-1, -1);
+                        win.set_default_size(width, height);
+                    }
+                },
+            );
         }
 
         fn instance_init(obj: &subclass::InitializingObject<Self>) {

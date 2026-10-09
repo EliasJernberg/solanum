@@ -165,6 +165,15 @@ impl SolanumApplication {
                     let _ = win.activate_action("win.toggle-rain-sound", None);
                 })
                 .build(),
+            // And the window size, for desktops whose window manager cannot
+            // resize it: `gapplication action org.gnome.Solanum set-size '(360, 360)'`.
+            gio::ActionEntryBuilder::new("set-size")
+                .parameter_type(Some(glib::VariantTy::new("(ii)").unwrap()))
+                .activate(|app: &Self, _, param| {
+                    let win: gtk::Widget = app.get_main_window().upcast();
+                    let _ = win.activate_action("win.set-size", param);
+                })
+                .build(),
         ];
 
         self.add_action_entries(actions);
