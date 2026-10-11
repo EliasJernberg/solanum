@@ -6,3 +6,5 @@ data/sounds/cover.jpg
 subprojects/blueprint-compiler/
 .fenv/
 .flatpak-builder/
+# Screenshots of the design variants, for comparing locally
+design-varianter/

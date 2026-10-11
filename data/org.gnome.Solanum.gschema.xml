@@ -70,5 +70,10 @@
       <summary>Sound played instead of the end sound when a work lap reaches the daily goal.</summary>
       <description>Path to an audio file. Empty means the same sound as end-sound-file, 'none' means no sound.</description>
     </key>
+    <key name="timer-font" type="s">
+      <default>''</default>
+      <summary>Typeface of the timer.</summary>
+      <description>Empty means the default. 'display', 'serif' and 'mono' pick one of the built-in styles; anything else is read as a font description such as 'Noto Sans Light' and used for the clock.</description>
+    </key>
   </schema>
 </schemalist>

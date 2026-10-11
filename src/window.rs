@@ -25,6 +25,7 @@ use gtk::glib;
 use gtk::prelude::*;
 use webkit6::prelude::*;
 
+use glib::translate::IntoGlib;
 use glib::{clone, Enum};
 use gtk::CompositeTemplate;
 
@@ -42,6 +43,10 @@ use crate::config;
 use crate::i18n::*;
 use crate::sounds::{self, Cue, CuePlayer};
 use crate::timer::Timer;
+
+// The built-in looks of the clock that timer-font can name; the empty value
+// is the default look, set in style.css without a class.
+static TIMER_FONT_STYLES: &[&str] = &["serif", "mono"];
 
 static RAIN_SCRIPT_PATH: &str = "/org/gnome/Solanum/rain/raindrop-fx.js";
 static RAIN_IMAGE_PATH: &str = "/org/gnome/Solanum/rain/background.jpg";
@@ -192,10 +197,13 @@ mod imp {
         #[template_child]
         pub large_text_bp: TemplateChild<libadwaita::Breakpoint>,
         #[template_child]
+        pub huge_text_bp: TemplateChild<libadwaita::Breakpoint>,
+        #[template_child]
         pub rain_box: TemplateChild<gtk::Box>,
         pub rain_view: RefCell<Option<webkit6::WebView>>,
         pub rain_session: OnceCell<webkit6::NetworkSession>,
         pub rain_sound: RefCell<Option<RainSound>>,
+        pub timer_font_provider: RefCell<Option<gtk::CssProvider>>,
     }
 
     #[glib::object_subclass]
@@ -217,10 +225,12 @@ mod imp {
                 sound_button: TemplateChild::default(),
                 menu_button: TemplateChild::default(),
                 large_text_bp: TemplateChild::default(),
+                huge_text_bp: TemplateChild::default(),
                 rain_box: TemplateChild::default(),
                 rain_view: RefCell::new(None),
                 rain_session: OnceCell::new(),
                 rain_sound: RefCell::new(None),
+                timer_font_provider: RefCell::new(None),
             }
         }
 
@@ -295,40 +305,27 @@ mod imp {
         fn constructed(&self) {
             self.parent_constructed();
 
-            let timer_label = &*self.timer_label;
-            let lap_label = &*self.lap_label;
-            let today_label = &*self.today_label;
-            self.large_text_bp.connect_apply(clone!(
-                #[weak]
-                timer_label,
-                #[weak]
-                lap_label,
-                #[weak]
-                today_label,
-                move |_| {
-                    timer_label.add_css_class("large-timer");
-                    lap_label.remove_css_class("heading");
-                    lap_label.add_css_class("title-4");
-                    today_label.remove_css_class("heading");
-                    today_label.add_css_class("title-4");
-                }
-            ));
-
-            self.large_text_bp.connect_unapply(clone!(
-                #[weak]
-                timer_label,
-                #[weak]
-                lap_label,
-                #[weak]
-                today_label,
-                move |_| {
-                    timer_label.remove_css_class("large-timer");
-                    lap_label.remove_css_class("title-4");
-                    lap_label.add_css_class("heading");
-                    today_label.remove_css_class("title-4");
-                    today_label.add_css_class("heading");
-                }
-            ));
+            // The breakpoints only name the size of the text; style.css
+            // does the rest.
+            for (bp, class) in [
+                (&*self.large_text_bp, "large-text"),
+                (&*self.huge_text_bp, "huge-text"),
+            ] {
+                bp.connect_apply(clone!(
+                    #[weak(rename_to = win)]
+                    self.obj(),
+                    move |_| {
+                        win.add_css_class(class);
+                    }
+                ));
+                bp.connect_unapply(clone!(
+                    #[weak(rename_to = win)]
+                    self.obj(),
+                    move |_| {
+                        win.remove_css_class(class);
+                    }
+                ));
+            }
         }
 
         fn dispose(&self) {
@@ -403,10 +400,11 @@ impl SolanumWindow {
 
         self.setup_rain();
         self.setup_rain_sound();
+        self.setup_timer_font();
 
         let min = settings.uint("lap-length");
         imp.timer.set_duration(min);
-        timer_label.set_label(&format!("{:>02}∶00", min));
+        self.set_timer_label_from_secs(min * 60);
 
         imp.timer.connect_countdown_update(clone!(
             #[weak(rename_to = win)]
@@ -435,8 +433,7 @@ impl SolanumWindow {
 
     fn update_countdown(&self, min: u32, sec: u32) -> glib::ControlFlow {
         let imp = self.imp();
-        let label = &*imp.timer_label;
-        label.set_label(&format!("{:>02}∶{:>02}", min, sec));
+        imp.timer_label.set_label(&Self::clock_text(min, sec));
         glib::ControlFlow::Continue
     }
 
@@ -533,11 +530,16 @@ impl SolanumWindow {
 
     // Util for setting the timer label when given seconds
     fn set_timer_label_from_secs(&self, secs: u32) {
-        let imp = self.imp();
-        let label = &*imp.timer_label;
-        let min = secs / 60;
-        let secs = secs % 60;
-        label.set_label(&format!("{:>02}∶{:>02}", min, secs));
+        self.imp()
+            .timer_label
+            .set_label(&Self::clock_text(secs / 60, secs % 60));
+    }
+
+    // MM:SS. A plain colon rather than the ratio sign upstream uses, since
+    // not every typeface timer-font can pick has the ratio sign; the
+    // typefaces that matter centre their colon between figures themselves.
+    fn clock_text(min: u32, sec: u32) -> String {
+        format!("{:>02}:{:>02}", min, sec)
     }
 
     fn play_cue(&self, cue: Cue) {
@@ -674,6 +676,8 @@ impl SolanumWindow {
         if let Some(view) = imp.rain_view.take() {
             imp.rain_box.remove(&view);
         }
+        // Over the rain the labels and buttons have a look of their own.
+        self.remove_css_class("rainy");
 
         let app = self.application();
         let settings = app.gsettings();
@@ -711,6 +715,75 @@ impl SolanumWindow {
 
         imp.rain_box.append(&view);
         imp.rain_view.replace(Some(view));
+        self.add_css_class("rainy");
+    }
+
+    fn setup_timer_font(&self) {
+        let app = self.application();
+        app.gsettings().connect_changed(
+            Some("timer-font"),
+            clone!(
+                #[weak(rename_to = win)]
+                self,
+                move |_, _| {
+                    win.update_timer_font();
+                }
+            ),
+        );
+        self.update_timer_font();
+    }
+
+    // timer-font is either empty (the default look), the name of one of the
+    // other built-in looks, which style.css keys on a class of the window,
+    // or a font description such as "Noto Sans Light" for the clock alone.
+    fn update_timer_font(&self) {
+        let imp = self.imp();
+        let app = self.application();
+        let value = app.gsettings().string("timer-font");
+        let value = value.trim();
+
+        for style in TIMER_FONT_STYLES {
+            self.remove_css_class(&format!("font-{}", style));
+        }
+        if let Some(provider) = imp.timer_font_provider.take() {
+            gtk::style_context_remove_provider_for_display(&WidgetExt::display(self), &provider);
+        }
+
+        if value.is_empty() || value == "display" {
+            return;
+        }
+
+        if TIMER_FONT_STYLES.contains(&value) {
+            self.add_css_class(&format!("font-{}", value));
+            return;
+        }
+
+        let desc = gtk::pango::FontDescription::from_string(value);
+        let Some(family) = desc.family() else {
+            return;
+        };
+        let mut css = format!(
+            ".timer-label {{ font-family: \"{}\"; font-variation-settings: normal;",
+            family.replace(['"', '\\'], "")
+        );
+        if desc.set_fields().contains(gtk::pango::FontMask::WEIGHT) {
+            css.push_str(&format!(" font-weight: {};", desc.weight().into_glib()));
+        }
+        if desc.set_fields().contains(gtk::pango::FontMask::STYLE)
+            && desc.style() != gtk::pango::Style::Normal
+        {
+            css.push_str(" font-style: italic;");
+        }
+        css.push_str(" }");
+
+        let provider = gtk::CssProvider::new();
+        provider.load_from_data(&css);
+        gtk::style_context_add_provider_for_display(
+            &WidgetExt::display(self),
+            &provider,
+            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 1,
+        );
+        imp.timer_font_provider.replace(Some(provider));
     }
 
     fn rain_html(image_path: &str) -> Option<String> {

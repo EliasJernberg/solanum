@@ -29,15 +29,14 @@ template $SolanumWindow : Adw.ApplicationWindow {
         orientation: vertical;
         valign: center;
         vexpand: true;
-        spacing: 6;
         styles ["main-box"]
 
         Gtk.Label lap_label {
-          styles ["heading", "dim-label"]
+          styles ["lap-label"]
         }
 
         Gtk.Label timer_label {
-          styles ["timer-label", "accent", "blinking"]
+          styles ["timer-label", "blinking"]
         }
 
         // The count of the day, with buttons to step it by hand that show
@@ -56,7 +55,7 @@ template $SolanumWindow : Adw.ApplicationWindow {
           }
 
           Gtk.Label today_label {
-            styles ["heading", "dim-label"]
+            styles ["today-label"]
           }
 
           Gtk.Button today_forward_button {
@@ -68,13 +67,13 @@ template $SolanumWindow : Adw.ApplicationWindow {
           }
         }
 
-        Gtk.CenterBox {
-          margin-bottom: 48;
+        Gtk.CenterBox controls {
           halign: center;
+          styles ["controls"]
 
           [center]
           Gtk.Box {
-            spacing: 12;
+            spacing: 14;
             halign: center;
 
             Gtk.Button timer_button {
@@ -82,7 +81,7 @@ template $SolanumWindow : Adw.ApplicationWindow {
               icon-name: "media-playback-start-symbolic";
               action-name: "win.toggle-timer";
               valign: center;
-              styles ["circular", "large", "suggested-action"]
+              styles ["circular", "large", "primary-control", "suggested-action"]
             }
 
             Gtk.Button skip_button {
@@ -109,8 +108,8 @@ template $SolanumWindow : Adw.ApplicationWindow {
             icon-name: "open-menu-symbolic";
             halign: end;
             valign: center;
-            margin-start: 12;
-            styles ["circular"]
+            margin-start: 14;
+            styles ["circular", "menu-control"]
           }
         }
       }
@@ -119,6 +118,11 @@ template $SolanumWindow : Adw.ApplicationWindow {
 
   Adw.Breakpoint large_text_bp {
     condition ("min-width: 800sp and min-height: 800sp")
+  }
+
+  // A window that fills a monitor gets a clock to match.
+  Adw.Breakpoint huge_text_bp {
+    condition ("min-width: 1600sp and min-height: 1000sp")
   }
 }
 
