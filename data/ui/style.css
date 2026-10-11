@@ -6,13 +6,13 @@
 }
 
 button.large {
-  min-width: 48px;
-  min-height: 48px;
+  min-width: 40px;
+  min-height: 40px;
 }
 
 /* Lap 1 / Short Break: small, spaced capitals above the clock. */
 .lap-label {
-  font-size: 0.82em;
+  font-size: 0.74em;
   font-weight: 600;
   letter-spacing: 0.22em;
   text-transform: uppercase;
@@ -33,7 +33,7 @@ button.large {
 }
 
 .today-label {
-  font-size: 0.86em;
+  font-size: 0.78em;
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -74,8 +74,8 @@ button.large {
 }
 
 button.primary-control {
-  min-width: 56px;
-  min-height: 56px;
+  min-width: 46px;
+  min-height: 46px;
 }
 
 /* Paused: the clock breathes slowly rather than blinking. */
@@ -96,7 +96,7 @@ button.primary-control {
 /* Larger windows. */
 .large-text .lap-label,
 .large-text .today-label {
-  font-size: 1.05em;
+  font-size: 0.88em;
 }
 
 .large-text .timer-label {
@@ -110,18 +110,18 @@ button.primary-control {
 }
 
 .large-text button.large {
-  min-width: 52px;
-  min-height: 52px;
+  min-width: 42px;
+  min-height: 42px;
 }
 
 .large-text button.primary-control {
-  min-width: 62px;
-  min-height: 62px;
+  min-width: 50px;
+  min-height: 50px;
 }
 
 .huge-text .lap-label,
 .huge-text .today-label {
-  font-size: 1.35em;
+  font-size: 1.0em;
 }
 
 .huge-text .timer-label {
@@ -135,20 +135,20 @@ button.primary-control {
 }
 
 .huge-text button.large {
-  min-width: 56px;
-  min-height: 56px;
-  -gtk-icon-size: 18px;
+  min-width: 44px;
+  min-height: 44px;
+  -gtk-icon-size: 15px;
 }
 
 .huge-text button.primary-control {
-  min-width: 68px;
-  min-height: 68px;
-  -gtk-icon-size: 20px;
+  min-width: 52px;
+  min-height: 52px;
+  -gtk-icon-size: 16px;
 }
 
 .huge-text .today-adjust {
-  min-width: 28px;
-  min-height: 28px;
+  min-width: 22px;
+  min-height: 22px;
 }
 
 /* Over the rain: white type and translucent glass buttons, so the scene
@@ -229,21 +229,21 @@ button.primary-control {
 }
 
 .font-serif .lap-label {
-  font-size: 1em;
+  font-size: 0.9em;
 }
 
 .font-serif .today-label {
-  font-size: 0.95em;
+  font-size: 0.86em;
 }
 
 .large-text.font-serif .lap-label,
 .large-text.font-serif .today-label {
-  font-size: 1.2em;
+  font-size: 1.0em;
 }
 
 .huge-text.font-serif .lap-label,
 .huge-text.font-serif .today-label {
-  font-size: 1.5em;
+  font-size: 1.12em;
 }
 
 /* timer-font 'mono': Noto Sans Mono Thin, spaced, with labels to match. */
