@@ -24,7 +24,7 @@ button.large {
    they count down. */
 .timer-label {
   font-family: "Adwaita Sans", "Inter", sans-serif;
-  font-size: 6em;
+  font-size: 4.6em;
   font-weight: 200;
   font-variation-settings: "opsz" 32;
   font-feature-settings: "tnum" 1, "ss01" 1;
@@ -100,7 +100,7 @@ button.primary-control {
 }
 
 .large-text .timer-label {
-  font-size: 11em;
+  font-size: 8.4em;
   margin-top: -6px;
   margin-bottom: 2px;
 }
@@ -125,7 +125,7 @@ button.primary-control {
 }
 
 .huge-text .timer-label {
-  font-size: 16em;
+  font-size: 12em;
   margin-top: -10px;
   margin-bottom: 4px;
 }
