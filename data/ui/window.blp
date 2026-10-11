@@ -40,8 +40,32 @@ template $SolanumWindow : Adw.ApplicationWindow {
           styles ["timer-label", "accent", "blinking"]
         }
 
-        Gtk.Label today_label {
-          styles ["heading", "dim-label"]
+        // The count of the day, with buttons to step it by hand that show
+        // when the pointer is over it.
+        Gtk.Box today_box {
+          halign: center;
+          spacing: 6;
+          styles ["today-row"]
+
+          Gtk.Button today_back_button {
+            tooltip-text: _("Count Lap Back");
+            icon-name: "list-remove-symbolic";
+            action-name: "win.lap-back";
+            valign: center;
+            styles ["flat", "circular", "today-adjust"]
+          }
+
+          Gtk.Label today_label {
+            styles ["heading", "dim-label"]
+          }
+
+          Gtk.Button today_forward_button {
+            tooltip-text: _("Count Lap Forward");
+            icon-name: "list-add-symbolic";
+            action-name: "win.lap-forward";
+            valign: center;
+            styles ["flat", "circular", "today-adjust"]
+          }
         }
 
         Gtk.CenterBox {
@@ -101,6 +125,11 @@ template $SolanumWindow : Adw.ApplicationWindow {
 menu app_menu {
   section {
     item (_("Reset Sessions"), "win.reset")
+  }
+
+  section {
+    item (_("Count Lap Forward"), "win.lap-forward")
+    item (_("Count Lap Back"), "win.lap-back")
     item (_("Reset Today's Count"), "win.reset-today")
   }
 

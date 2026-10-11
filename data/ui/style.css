@@ -37,3 +37,22 @@ button.large {
 .large-timer {
   font-size:  600%;
 }
+
+/* The buttons that count the day's laps forward and back stay out of the
+   way until the pointer is over the count. */
+.today-adjust {
+  min-width: 22px;
+  min-height: 22px;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.today-row:hover .today-adjust,
+.today-adjust:focus-visible {
+  opacity: 0.85;
+}
+
+.today-row:hover .today-adjust:disabled {
+  opacity: 0.25;
+}

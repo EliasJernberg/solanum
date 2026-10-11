@@ -251,6 +251,14 @@ mod imp {
                 win.toggle_rain_sound();
             });
 
+            klass.install_action("win.lap-forward", None, move |win, _, _| {
+                win.adjust_today(1);
+            });
+
+            klass.install_action("win.lap-back", None, move |win, _, _| {
+                win.adjust_today(-1);
+            });
+
             klass.install_action("win.skip", None, move |win, _, _| {
                 win.next_lap(None);
 
@@ -379,16 +387,19 @@ impl SolanumWindow {
         self.update_lap_label();
         self.update_today_label();
 
-        settings.connect_changed(
-            Some("daily-goal"),
-            clone!(
-                #[weak(rename_to = win)]
-                self,
-                move |_, _| {
-                    win.update_today_label();
-                }
-            ),
-        );
+        // The count can also change from outside, e.g. with gsettings.
+        for key in ["daily-goal", "laps-today", "laps-date"] {
+            settings.connect_changed(
+                Some(key),
+                clone!(
+                    #[weak(rename_to = win)]
+                    self,
+                    move |_, _| {
+                        win.update_today_label();
+                    }
+                ),
+            );
+        }
 
         self.setup_rain();
         self.setup_rain_sound();
@@ -588,20 +599,28 @@ impl SolanumWindow {
     // reaches the daily goal.
     fn record_completed_lap(&self) -> bool {
         let before = self.laps_today();
-        let app = self.application();
-        let settings = app.gsettings();
-        let goal = settings.uint("daily-goal");
-        let _ = settings.set_string("laps-date", &Self::today());
-        let _ = settings.set_uint("laps-today", before + 1);
-        self.update_today_label();
+        let goal = self.application().gsettings().uint("daily-goal");
+        self.set_laps_today(before + 1);
         before < goal && before + 1 >= goal
     }
 
+    // Step the day's count by hand, e.g. for laps done while the app was
+    // closed. It never goes below zero, and leaves the running timer and
+    // the laps until the long break alone.
+    fn adjust_today(&self, delta: i32) {
+        self.set_laps_today(self.laps_today().saturating_add_signed(delta));
+    }
+
     fn reset_today(&self) {
+        self.set_laps_today(0);
+    }
+
+    // Store the count under today's date, so it is not read as stale.
+    fn set_laps_today(&self, count: u32) {
         let app = self.application();
         let settings = app.gsettings();
         let _ = settings.set_string("laps-date", &Self::today());
-        let _ = settings.set_uint("laps-today", 0);
+        let _ = settings.set_uint("laps-today", count);
         self.update_today_label();
     }
 
@@ -623,6 +642,8 @@ impl SolanumWindow {
         } else {
             imp.today_label.remove_css_class("success");
         }
+
+        self.action_set_enabled("win.lap-back", done > 0);
     }
 
     fn setup_rain(&self) {

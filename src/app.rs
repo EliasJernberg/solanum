@@ -174,6 +174,20 @@ impl SolanumApplication {
                     let _ = win.activate_action("win.set-size", param);
                 })
                 .build(),
+            // And for stepping the day's count by hand, e.g.
+            // `gapplication action org.gnome.Solanum lap-forward`.
+            gio::ActionEntryBuilder::new("lap-forward")
+                .activate(|app: &Self, _, _| {
+                    let win: gtk::Widget = app.get_main_window().upcast();
+                    let _ = win.activate_action("win.lap-forward", None);
+                })
+                .build(),
+            gio::ActionEntryBuilder::new("lap-back")
+                .activate(|app: &Self, _, _| {
+                    let win: gtk::Widget = app.get_main_window().upcast();
+                    let _ = win.activate_action("win.lap-back", None);
+                })
+                .build(),
         ];
 
         self.add_action_entries(actions);
@@ -186,6 +200,14 @@ impl SolanumApplication {
         self.set_accels_for_action("win.next-background", &["<Primary>Right"]);
         self.set_accels_for_action("win.previous-background", &["<Primary>Left"]);
         self.set_accels_for_action("win.toggle-rain-sound", &["<Primary>r"]);
+        self.set_accels_for_action(
+            "win.lap-forward",
+            &["<Primary>Up", "<Primary>plus", "<Primary>KP_Add"],
+        );
+        self.set_accels_for_action(
+            "win.lap-back",
+            &["<Primary>Down", "<Primary>minus", "<Primary>KP_Subtract"],
+        );
     }
 
     // About dialog

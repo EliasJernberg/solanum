@@ -34,6 +34,20 @@ Gtk.ShortcutsWindow help_overlay {
     }
 
     Gtk.ShortcutsGroup {
+      title: C_("shortcut window", "Today's Count");
+
+      Gtk.ShortcutsShortcut {
+        title: C_("shortcut window", "Count Lap Forward");
+        action-name: "win.lap-forward";
+      }
+
+      Gtk.ShortcutsShortcut {
+        title: C_("shortcut window", "Count Lap Back");
+        action-name: "win.lap-back";
+      }
+    }
+
+    Gtk.ShortcutsGroup {
       title: C_("shortcut window", "Rain Background");
 
       Gtk.ShortcutsShortcut {

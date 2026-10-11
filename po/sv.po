@@ -317,6 +317,29 @@ msgstr "Ingen"
 msgid "Audio"
 msgstr "Ljud"
 
+#: data/ui/window.blp:44 data/ui/window.blp:135
+msgid "Count Lap Back"
+msgstr "Räkna tillbaka ett varv"
+
+#: data/ui/window.blp:56 data/ui/window.blp:134
+msgid "Count Lap Forward"
+msgstr "Räkna fram ett varv"
+
+#: data/gtk/help-overlay.blp:40
+msgctxt "shortcut window"
+msgid "Today's Count"
+msgstr "Dagens räkning"
+
+#: data/gtk/help-overlay.blp:43
+msgctxt "shortcut window"
+msgid "Count Lap Forward"
+msgstr "Räkna fram ett varv"
+
+#: data/gtk/help-overlay.blp:48
+msgctxt "shortcut window"
+msgid "Count Lap Back"
+msgstr "Räkna tillbaka ett varv"
+
 #: data/ui/preferences-window.blp:140
 msgid "Sounds"
 msgstr "Ljud"
