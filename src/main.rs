@@ -25,6 +25,7 @@ mod app;
 mod config;
 mod i18n;
 mod preferences_window;
+mod sounds;
 mod timer;
 mod window;
 

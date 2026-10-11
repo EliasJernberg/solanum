@@ -40,10 +40,8 @@ use std::path::{Path, PathBuf};
 use crate::app::SolanumApplication;
 use crate::config;
 use crate::i18n::*;
+use crate::sounds::{self, Cue, CuePlayer};
 use crate::timer::Timer;
-
-static CHIME_URI: &str = "resource:///org/gnome/Solanum/chime.ogg";
-static BEEP_URI: &str = "resource:///org/gnome/Solanum/beep.ogg";
 
 static RAIN_SCRIPT_PATH: &str = "/org/gnome/Solanum/rain/raindrop-fx.js";
 static RAIN_IMAGE_PATH: &str = "/org/gnome/Solanum/rain/background.jpg";
@@ -176,7 +174,7 @@ mod imp {
     pub struct SolanumWindow {
         pub pomodoro_count: Cell<u32>,
         pub timer: Timer,
-        pub player: gstreamer_play::Play,
+        pub cues: CuePlayer,
         pub lap_type: Cell<LapType>,
 
         #[template_child]
@@ -210,7 +208,7 @@ mod imp {
             Self {
                 pomodoro_count: Cell::new(1),
                 timer: Timer::new(),
-                player: gstreamer_play::Play::new(None::<gstreamer_play::PlayVideoRenderer>),
+                cues: CuePlayer::new(),
                 lap_type: Default::default(),
                 lap_label: TemplateChild::default(),
                 timer_label: TemplateChild::default(),
@@ -254,7 +252,7 @@ mod imp {
             });
 
             klass.install_action("win.skip", None, move |win, _, _| {
-                win.next_lap(false);
+                win.next_lap(None);
 
                 if !win.is_active() {
                     win.present();
@@ -412,12 +410,14 @@ impl SolanumWindow {
             self,
             move |_| {
                 // Only a work lap that ran out on the clock counts towards the
-                // daily goal; skipping a lap does not.
-                if win.imp().lap_type.get() == LapType::Pomodoro {
-                    win.record_completed_lap();
+                // daily goal; skipping a lap does not. The lap that reaches
+                // the goal ends with the goal sound.
+                let mut cue = Cue::End;
+                if win.imp().lap_type.get() == LapType::Pomodoro && win.record_completed_lap() {
+                    cue = Cue::Goal;
                 }
                 win.toggle_timer();
-                win.next_lap(true);
+                win.next_lap(Some(cue));
             }
         ));
     }
@@ -480,7 +480,7 @@ impl SolanumWindow {
             let app = self.application();
             app.withdraw_notification("timer-notif");
             imp.timer.start();
-            self.play_sound(BEEP_URI);
+            self.play_cue(Cue::Start);
             imp.timer_button
                 .set_icon_name("media-playback-pause-symbolic");
             imp.timer_label.remove_css_class("blinking");
@@ -529,13 +529,14 @@ impl SolanumWindow {
         label.set_label(&format!("{:>02}∶{:>02}", min, secs));
     }
 
-    fn play_sound(&self, uri: &str) {
-        let player = &self.imp().player;
-        player.set_uri(Some(uri));
-        player.play();
+    fn play_cue(&self, cue: Cue) {
+        let app = self.application();
+        if let Some(uri) = sounds::uri(app.gsettings(), cue) {
+            self.imp().cues.play_uri(&uri);
+        }
     }
 
-    fn send_notifcation(&self, lap_type: LapType) {
+    fn send_notifcation(&self, lap_type: LapType, cue: Cue) {
         if !self.is_active() {
             let notif = gio::Notification::new(&i18n("Solanum"));
             // Set notification text based on lap type
@@ -559,7 +560,7 @@ impl SolanumWindow {
             let app = self.application();
             app.send_notification(Some("timer-notif"), &notif);
         }
-        self.play_sound(CHIME_URI);
+        self.play_cue(cue);
     }
 
     // Today's date as YYYY-MM-DD, the key the daily count is stored under.
@@ -583,13 +584,17 @@ impl SolanumWindow {
         }
     }
 
-    fn record_completed_lap(&self) {
-        let count = self.laps_today() + 1;
+    // Count a completed work lap. Returns true when it is the lap that
+    // reaches the daily goal.
+    fn record_completed_lap(&self) -> bool {
+        let before = self.laps_today();
         let app = self.application();
         let settings = app.gsettings();
+        let goal = settings.uint("daily-goal");
         let _ = settings.set_string("laps-date", &Self::today());
-        let _ = settings.set_uint("laps-today", count);
+        let _ = settings.set_uint("laps-today", before + 1);
         self.update_today_label();
+        before < goal && before + 1 >= goal
     }
 
     fn reset_today(&self) {
@@ -1051,8 +1056,9 @@ impl SolanumWindow {
         ));
     }
 
-    // Move to the next lap
-    fn next_lap(&self, notify: bool) {
+    // Move to the next lap, with a notification and the given sound when the
+    // lap ran out on the clock
+    fn next_lap(&self, notify: Option<Cue>) {
         let imp = self.imp();
         let lap_type = imp.lap_type.get();
 
@@ -1064,8 +1070,8 @@ impl SolanumWindow {
 
         self.update_lap(next_lap);
 
-        if notify {
-            self.send_notifcation(next_lap);
+        if let Some(cue) = notify {
+            self.send_notifcation(next_lap, cue);
         }
     }
 }

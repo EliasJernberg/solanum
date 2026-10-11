@@ -316,3 +316,61 @@ msgstr "Ingen"
 #: src/preferences_window.rs:256
 msgid "Audio"
 msgstr "Ljud"
+
+#: data/ui/preferences-window.blp:140
+msgid "Sounds"
+msgstr "Ljud"
+
+#: data/ui/preferences-window.blp:141
+msgid ""
+"Played when the timer starts, when a lap ends, and instead of the lap end "
+"sound when a work lap reaches the daily goal."
+msgstr ""
+"Spelas när timern startar, när ett varv tar slut och i stället för "
+"varvslutets ljud när ett arbetsvarv når dagsmålet."
+
+#: data/ui/preferences-window.blp:144
+msgid "Timer Start"
+msgstr "Timern startar"
+
+#: data/ui/preferences-window.blp:149 src/preferences_window.rs:405
+msgid "Play"
+msgstr "Spela"
+
+#: src/preferences_window.rs:403
+msgid "Stop"
+msgstr "Stoppa"
+
+#: data/ui/preferences-window.blp:162 data/ui/preferences-window.blp:236
+msgid "No Sound"
+msgstr "Inget ljud"
+
+#: data/ui/preferences-window.blp:171
+msgid "Lap End"
+msgstr "Varvet slutar"
+
+#: data/ui/preferences-window.blp:190
+msgid "Reset to Built-in Chime"
+msgstr "Återställ till inbyggd klocka"
+
+#: data/ui/preferences-window.blp:198
+msgid "Daily Goal Reached"
+msgstr "Dagsmålet nått"
+
+#: data/ui/preferences-window.blp:217
+msgid "Reset to Lap End Sound"
+msgstr "Återställ till varvslutets ljud"
+
+#: src/preferences_window.rs:375
+msgid "Built-in Chime"
+msgstr "Inbyggd klocka"
+
+#: src/preferences_window.rs:376
+msgid "Same as Lap End"
+msgstr "Samma som varvslutet"
+
+#. Translators: {} is the name of a sound file that
+#. is gone; the built-in chime plays instead.
+#: src/preferences_window.rs:388
+msgid "{} (not found)"
+msgstr "{} (hittades inte)"

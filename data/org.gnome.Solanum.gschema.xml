@@ -55,5 +55,20 @@
       <default>60</default>
       <summary>The volume of the rain sound in percent.</summary>
     </key>
+    <key name="start-sound-file" type="s">
+      <default>''</default>
+      <summary>Sound played when the timer starts.</summary>
+      <description>Path to an audio file. Empty (or 'none') means no sound.</description>
+    </key>
+    <key name="end-sound-file" type="s">
+      <default>''</default>
+      <summary>Sound played when a lap ends.</summary>
+      <description>Path to an audio file. Empty means the built-in chime, 'none' means no sound. A file that cannot be played falls back on the built-in chime.</description>
+    </key>
+    <key name="goal-sound-file" type="s">
+      <default>''</default>
+      <summary>Sound played instead of the end sound when a work lap reaches the daily goal.</summary>
+      <description>Path to an audio file. Empty means the same sound as end-sound-file, 'none' means no sound.</description>
+    </key>
   </schema>
 </schemalist>

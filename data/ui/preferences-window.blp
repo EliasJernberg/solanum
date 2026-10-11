@@ -134,5 +134,124 @@ template $SolanumPreferencesWindow : Adw.PreferencesWindow {
         };
       }
     }
+
+    Adw.PreferencesGroup {
+      title: _("Sounds");
+      description: _("Played when the timer starts, when a lap ends, and instead of the lap end sound when a work lap reaches the daily goal.");
+
+      Adw.ActionRow start_sound_row {
+        title: _("Timer Start");
+        use-markup: false;
+
+        [suffix]
+        Gtk.Button start_sound_play_button {
+          tooltip-text: _("Play");
+          icon-name: "media-playback-start-symbolic";
+          valign: center;
+          styles ["flat", "circular"]
+        }
+
+        [suffix]
+        Adw.SplitButton start_sound_choose_button {
+          label: _("Choose…");
+          menu-model: start_sound_menu;
+          valign: center;
+        }
+
+        [suffix]
+        Gtk.Button start_sound_reset_button {
+          tooltip-text: _("No Sound");
+          icon-name: "edit-clear-symbolic";
+          valign: center;
+          styles ["flat", "circular"]
+        }
+      }
+
+      Adw.ActionRow end_sound_row {
+        title: _("Lap End");
+        use-markup: false;
+
+        [suffix]
+        Gtk.Button end_sound_play_button {
+          tooltip-text: _("Play");
+          icon-name: "media-playback-start-symbolic";
+          valign: center;
+          styles ["flat", "circular"]
+        }
+
+        [suffix]
+        Adw.SplitButton end_sound_choose_button {
+          label: _("Choose…");
+          menu-model: end_sound_menu;
+          valign: center;
+        }
+
+        [suffix]
+        Gtk.Button end_sound_reset_button {
+          tooltip-text: _("Reset to Built-in Chime");
+          icon-name: "edit-undo-symbolic";
+          valign: center;
+          styles ["flat", "circular"]
+        }
+      }
+
+      Adw.ActionRow goal_sound_row {
+        title: _("Daily Goal Reached");
+        use-markup: false;
+
+        [suffix]
+        Gtk.Button goal_sound_play_button {
+          tooltip-text: _("Play");
+          icon-name: "media-playback-start-symbolic";
+          valign: center;
+          styles ["flat", "circular"]
+        }
+
+        [suffix]
+        Adw.SplitButton goal_sound_choose_button {
+          label: _("Choose…");
+          menu-model: goal_sound_menu;
+          valign: center;
+        }
+
+        [suffix]
+        Gtk.Button goal_sound_reset_button {
+          tooltip-text: _("Reset to Lap End Sound");
+          icon-name: "edit-undo-symbolic";
+          valign: center;
+          styles ["flat", "circular"]
+        }
+      }
+    }
+  }
+}
+
+menu start_sound_menu {
+  section {
+    item {
+      label: _("No Sound");
+      action: "sounds.set-start";
+      target: "none";
+    }
+  }
+}
+
+menu end_sound_menu {
+  section {
+    item {
+      label: _("No Sound");
+      action: "sounds.set-end";
+      target: "none";
+    }
+  }
+}
+
+menu goal_sound_menu {
+  section {
+    item {
+      label: _("No Sound");
+      action: "sounds.set-goal";
+      target: "none";
+    }
   }
 }
