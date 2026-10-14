@@ -152,6 +152,7 @@ struct State {
     first_update: Option<i64>,
     pending: Option<Time>,
     fixed_steps: Option<u32>,
+    last_resize: i64,
     dump: Option<Dump>,
 }
 
@@ -223,6 +224,7 @@ pub fn new_view(image: &[u8]) -> Option<gtk::Widget> {
         first_update: None,
         pending: None,
         fixed_steps,
+        last_resize: 0,
         dump,
     }));
 
@@ -304,6 +306,7 @@ pub fn new_view(image: &[u8]) -> Option<gtk::Widget> {
                 return;
             }
             state.size = size;
+            state.last_resize = glib::monotonic_time();
             let (width, height) = (f64::from(size.0), f64::from(size.1));
             let options = state.options;
             match state.simulator.as_mut() {
@@ -359,10 +362,11 @@ fn tick(area: &gtk::GLArea, state: &mut State, now: i64) {
     }
     let origin = *state.origin.get_or_insert(now);
 
-    // The fixed run happens all at once in the next render, and after it
-    // only a frame to dump is still asked for.
+    // The fixed run happens all at once in a render once the size has
+    // settled (a resize afterwards would clear the droplets and the mist),
+    // and after it only a frame to dump is still asked for.
     if state.fixed_steps.is_some() {
-        if state.first_update.is_none() || dump_due(state, now) {
+        if (state.first_update.is_none() && fixed_run_due(state)) || dump_due(state, now) {
             area.queue_render();
         }
         return;
@@ -390,6 +394,10 @@ fn tick(area: &gtk::GLArea, state: &mut State, now: i64) {
     area.queue_render();
 }
 
+fn fixed_run_due(state: &State) -> bool {
+    glib::monotonic_time() - state.last_resize >= 1_000_000
+}
+
 fn dump_due(state: &State, now: i64) -> bool {
     match (&state.dump, state.first_update) {
         (Some(dump), Some(first)) => !dump.done && (now - first) as f64 / 1e6 >= dump.after,
@@ -407,7 +415,7 @@ fn render(area: &gtk::GLArea, state: &mut State) {
         .unwrap_or_else(glib::monotonic_time);
 
     if let Some(steps) = state.fixed_steps {
-        if state.first_update.is_none() && state.simulator.is_some() {
+        if state.first_update.is_none() && state.simulator.is_some() && fixed_run_due(state) {
             for i in 1..=steps {
                 state.step(Time {
                     dt: 1.0 / 60.0,
