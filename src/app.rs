@@ -197,6 +197,8 @@ impl SolanumApplication {
     fn setup_accels(&self) {
         self.set_accels_for_action("app.preferences", &["<Primary>comma"]);
         self.set_accels_for_action("app.quit", &["<Primary>q"]);
+        // The header bar has no close button; Ctrl+W (Cmd+W on macOS) closes.
+        self.set_accels_for_action("window.close", &["<Primary>w"]);
         self.set_accels_for_action("win.next-background", &["<Primary>Right"]);
         self.set_accels_for_action("win.previous-background", &["<Primary>Left"]);
         self.set_accels_for_action("win.toggle-rain-sound", &["<Primary>r"]);
