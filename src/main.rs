@@ -25,6 +25,7 @@ mod app;
 mod config;
 mod i18n;
 mod preferences_window;
+mod rain;
 mod sounds;
 mod timer;
 mod window;
@@ -33,13 +34,13 @@ use crate::app::SolanumApplication;
 
 // Entry point for the application
 fn main() -> glib::ExitCode {
-    // The rain background is a WebKit view whose frames arrive as dmabufs.
-    // GTK's default Vulkan renderer cannot import them on every driver (on
-    // NVIDIA it rejects WebKit's XR24 buffers) and then copies each frame
-    // through the CPU, which costs more than a full core. The GL renderer
-    // imports them directly. Set before anything else runs, and only when
-    // the user has not chosen a renderer. Dmabufs are a Linux matter; other
-    // systems keep GTK's own choice.
+    // The rain background is a GtkGLArea. GTK's GL renderer draws its
+    // frames straight from the GL texture, while the default Vulkan
+    // renderer has to import them as dmabufs, which not every driver does
+    // (WebKit's frames, which the rain used to be, were copied through the
+    // CPU on NVIDIA at the cost of more than a full core). Set before
+    // anything else runs, and only when the user has not chosen a renderer.
+    // Dmabufs are a Linux matter; other systems keep GTK's own choice.
     #[cfg(target_os = "linux")]
     if std::env::var_os("GSK_RENDERER").is_none() {
         std::env::set_var("GSK_RENDERER", "gl");

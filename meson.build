@@ -12,9 +12,6 @@ dependency('gstreamer-base-1.0', version: '>= 1.20')
 dependency('gstreamer-audio-1.0', version: '>= 1.20')
 dependency('gstreamer-play-1.0', version: '>= 1.20')
 dependency('gstreamer-plugins-base-1.0', version: '>= 1.20')
-# The animated rain background. Without WebKitGTK (e.g. on macOS) the chosen
-# background is shown as a still image instead.
-webkit_dep = dependency('webkitgtk-6.0', version: '>= 2.40', required: get_option('rain'))
 
 i18n = import('i18n')
 gnome = import('gnome')

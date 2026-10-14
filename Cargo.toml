@@ -9,18 +9,15 @@ glib-macros = "0.19"
 gstreamer = "0.23"
 gstreamer-play = "0.23"
 libadwaita = { version = "0.7", features = ["v1_5"] }
-webkit6 = { version = "0.4", optional = true }
-
-[features]
-default = ["rain"]
-# The animated rain background, a WebKitGTK view. Without it the chosen
-# background is shown as a still image (WebKitGTK is not available on macOS).
-rain = ["dep:webkit6"]
+# The rain background: raindrop-fx ported to OpenGL in a GtkGLArea, with
+# the GL entry points looked up through libepoxy.
+glow = "0.18"
+libc = "0.2"
 
 [dependencies.gtk]
 version = "0.9"
 package ="gtk4"
-features = ["v4_10"]
+features = ["v4_12"]
 
 [dependencies.gettext-rs]
 version = "0.7.0"

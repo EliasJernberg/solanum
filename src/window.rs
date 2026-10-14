@@ -19,12 +19,9 @@
 
 use gst::prelude::*;
 use gstreamer as gst;
-use gtk::gdk;
 use gtk::gio;
 use gtk::glib;
 use gtk::prelude::*;
-#[cfg(feature = "rain")]
-use webkit6::prelude::*;
 
 use glib::translate::IntoGlib;
 use glib::{clone, Enum};
@@ -36,14 +33,13 @@ use gtk::prelude::IsA;
 use gtk::subclass::prelude::*;
 use libadwaita::subclass::prelude::*;
 
-#[cfg(feature = "rain")]
-use std::cell::OnceCell;
 use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
 
 use crate::app::SolanumApplication;
 use crate::config;
 use crate::i18n::*;
+use crate::rain;
 use crate::sounds::{self, Cue, CuePlayer};
 use crate::timer::Timer;
 
@@ -51,102 +47,10 @@ use crate::timer::Timer;
 // is the default look, set in style.css without a class.
 static TIMER_FONT_STYLES: &[&str] = &["serif", "mono"];
 
-#[cfg(feature = "rain")]
-static RAIN_SCRIPT_PATH: &str = "/org/gnome/Solanum/rain/raindrop-fx.js";
 static RAIN_IMAGE_PATH: &str = "/org/gnome/Solanum/rain/background.jpg";
 
 // File types picked up when cycling through the background images in a folder.
 static BACKGROUND_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp"];
-
-// The rain page: raindrop-fx (https://github.com/SardineFish/raindrop-fx, MIT)
-// renders drops running down a pane of glass in WebGL, with the background
-// image blurred behind it. @SCRIPT@ and @BACKGROUND@ are filled in at runtime;
-// the image is passed as a data: URI so WebGL can use it as a texture without
-// any file access from the page.
-#[cfg(feature = "rain")]
-static RAIN_HTML: &str = r##"<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-  html, body { margin: 0; background: #000; overflow: hidden; }
-  #canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
-  /* Darken the scene so the timer stays readable, a little more in the
-     middle where the labels are. This is done here rather than with a
-     text-shadow in GTK, which would be re-rendered on every frame of the
-     rain and triple the CPU time of the window. */
-  #shade {
-    position: fixed; inset: 0;
-    background: radial-gradient(ellipse 50% 40% at 50% 50%, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.35));
-  }
-</style>
-</head>
-<body>
-<canvas id="canvas"></canvas>
-<div id="shade"></div>
-<script>@SCRIPT@</script>
-<script>
-  (() => {
-    const canvas = document.querySelector("#canvas");
-    let raindropFx = null;
-    let ready = false;
-
-    const resize = () => {
-      if (!ready)
-        return;
-      const rect = canvas.getBoundingClientRect();
-      if (rect.width >= 1 && rect.height >= 1)
-        raindropFx.resize(rect.width, rect.height);
-    };
-
-    // raindrop-fx's own frame loop is stopped below and the rain is driven
-    // from here: at most about 60 updates per second, each advancing the
-    // simulation by the real time since the last one. The rain then falls
-    // in real time on any monitor (upstream steps a fixed 0.03 s per frame,
-    // 1.8x real time at 60 Hz) and does not burn GPU and CPU time on frames
-    // nobody needs. The step is capped so the rain does not jump ahead
-    // after the page has been hidden.
-    const frameMs = 1000 / 60;
-    let last = 0;
-    const tick = (now) => {
-      requestAnimationFrame(tick);
-      const elapsed = now - last;
-      if (elapsed < frameMs - 3)
-        return;
-      last = now;
-      const dt = Math.min(elapsed / 1000, 0.1);
-      raindropFx.update({ dt: dt, total: now / 1000 });
-    };
-
-    // The view may not have been allocated yet when the page loads, and the
-    // simulation is set up for the canvas size it starts with, so wait for
-    // a real size first.
-    const boot = () => {
-      const rect = canvas.getBoundingClientRect();
-      if (rect.width < 1 || rect.height < 1) {
-        setTimeout(boot, 100);
-        return;
-      }
-      canvas.width = rect.width;
-      canvas.height = rect.height;
-      raindropFx = new RaindropFX({ canvas: canvas, background: "@BACKGROUND@" });
-      // start() loads the textures and then begins its own frame loop,
-      // which is swapped for the one above.
-      raindropFx.start().then(() => {
-        raindropFx.stop();
-        ready = true;
-        resize();
-        requestAnimationFrame(tick);
-      });
-    };
-
-    window.onresize = resize;
-    boot();
-  })();
-</script>
-</body>
-</html>
-"##;
 
 // The looping rain sound: a playbin3 playing the chosen file and the watch on
 // its bus. Dropping it stops the sound.
@@ -206,8 +110,6 @@ mod imp {
         #[template_child]
         pub rain_box: TemplateChild<gtk::Box>,
         pub rain_view: RefCell<Option<gtk::Widget>>,
-        #[cfg(feature = "rain")]
-        pub rain_session: OnceCell<webkit6::NetworkSession>,
         pub rain_sound: RefCell<Option<RainSound>>,
         pub timer_font_provider: RefCell<Option<gtk::CssProvider>>,
     }
@@ -234,8 +136,6 @@ mod imp {
                 huge_text_bp: TemplateChild::default(),
                 rain_box: TemplateChild::default(),
                 rain_view: RefCell::new(None),
-                #[cfg(feature = "rain")]
-                rain_session: OnceCell::new(),
                 rain_sound: RefCell::new(None),
                 timer_font_provider: RefCell::new(None),
             }
@@ -701,68 +601,10 @@ impl SolanumWindow {
         self.add_css_class("rainy");
     }
 
-    // The animated rain: raindrop-fx in a WebKit view.
-    #[cfg(feature = "rain")]
-    fn new_rain_view(&self, image_path: &str) -> Option<gtk::Widget> {
-        let html = Self::rain_html(image_path)?;
-
-        let web_settings = webkit6::Settings::new();
-        web_settings.set_enable_webgl(true);
-        web_settings
-            .set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
-
-        // An ephemeral session keeps WebKit from writing caches and storage
-        // next to our own data in $XDG_DATA_HOME/solanum.
-        let session = self
-            .imp()
-            .rain_session
-            .get_or_init(webkit6::NetworkSession::new_ephemeral);
-
-        let view = webkit6::WebView::builder()
-            .network_session(session)
-            .settings(&web_settings)
-            .hexpand(true)
-            .vexpand(true)
-            .build();
-        // The view is only decoration: clicks and keys belong to the timer.
-        view.set_can_focus(false);
-        view.set_can_target(false);
-        // Black instead of a white flash until the page has painted.
-        view.set_background_color(&gdk::RGBA::BLACK);
-        view.load_html(&html, None);
-
-        Some(view.upcast())
-    }
-
-    // Without WebKit (as on macOS) the background is the same image as a
-    // still, under the same shade as the rain page (.rain-shade in
-    // style.css) so the labels read as well.
-    #[cfg(not(feature = "rain"))]
+    // The animated rain: raindrop-fx ported to OpenGL (src/rain).
     fn new_rain_view(&self, image_path: &str) -> Option<gtk::Widget> {
         let (image, _) = Self::rain_image(image_path)?;
-        let texture = match gdk::Texture::from_bytes(&glib::Bytes::from_owned(image)) {
-            Ok(texture) => texture,
-            Err(err) => {
-                glib::g_warning!("solanum", "Could not show the background: {}", err);
-                return None;
-            }
-        };
-
-        let picture = gtk::Picture::builder()
-            .paintable(&texture)
-            .content_fit(gtk::ContentFit::Cover)
-            .hexpand(true)
-            .vexpand(true)
-            .build();
-        let shade = gtk::Box::builder().css_classes(["rain-shade"]).build();
-
-        let view = gtk::Overlay::builder().child(&picture).build();
-        view.add_overlay(&shade);
-        // The view is only decoration: clicks and keys belong to the timer.
-        view.set_can_focus(false);
-        view.set_can_target(false);
-
-        Some(view.upcast())
+        rain::new_view(&image)
     }
 
     fn setup_timer_font(&self) {
@@ -824,35 +666,13 @@ impl SolanumWindow {
         css.push_str(" }");
 
         let provider = gtk::CssProvider::new();
-        provider.load_from_data(&css);
+        provider.load_from_string(&css);
         gtk::style_context_add_provider_for_display(
             &WidgetExt::display(self),
             &provider,
             gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 1,
         );
         imp.timer_font_provider.replace(Some(provider));
-    }
-
-    #[cfg(feature = "rain")]
-    fn rain_html(image_path: &str) -> Option<String> {
-        let script =
-            match gio::resources_lookup_data(RAIN_SCRIPT_PATH, gio::ResourceLookupFlags::NONE) {
-                Ok(bytes) => bytes,
-                Err(err) => {
-                    glib::g_warning!("solanum", "Could not load the rain script: {}", err);
-                    return None;
-                }
-            };
-        let script = String::from_utf8_lossy(&script);
-
-        let (image, mime) = Self::rain_image(image_path)?;
-        let background = format!("data:{};base64,{}", mime, glib::base64_encode(&image));
-
-        Some(
-            RAIN_HTML
-                .replace("@BACKGROUND@", &background)
-                .replace("@SCRIPT@", &script),
-        )
     }
 
     // The image seen through the rain: the file in rain-image when it can be

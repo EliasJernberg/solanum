@@ -151,8 +151,8 @@ button.primary-control {
   min-height: 22px;
 }
 
-/* Without WebKit the background is a still image under the same shade as
-   the rain page: dark at the edges, a little darker in the middle where the
+/* Without OpenGL the background is a still image under the same shade as
+   the rain: dark at the edges, a little darker in the middle where the
    labels are. */
 .rain-shade {
   background-image: radial-gradient(ellipse 50% 40% at 50% 50%, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.35));
