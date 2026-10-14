@@ -1013,7 +1013,10 @@ impl SolanumWindow {
             .build()
             .map_err(|err| err.to_string())?;
         // Audio only, so a file with cover art never opens a video window.
-        playbin.set_property_from_str("flags", "audio");
+        // soft-volume gives playbin a volume element of its own for sinks
+        // that cannot take volume and mute themselves (osxaudiosink on
+        // macOS); the pulsesink below can, and then takes both as before.
+        playbin.set_property_from_str("flags", "audio+soft-volume");
         playbin.set_property("uri", &uri);
 
         // Play through PulseAudio (or PipeWire's server for it), whose
