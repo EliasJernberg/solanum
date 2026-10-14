@@ -23,6 +23,7 @@ use gtk::gdk;
 use gtk::gio;
 use gtk::glib;
 use gtk::prelude::*;
+#[cfg(feature = "rain")]
 use webkit6::prelude::*;
 
 use glib::translate::IntoGlib;
@@ -35,7 +36,9 @@ use gtk::prelude::IsA;
 use gtk::subclass::prelude::*;
 use libadwaita::subclass::prelude::*;
 
-use std::cell::{Cell, OnceCell, RefCell};
+#[cfg(feature = "rain")]
+use std::cell::OnceCell;
+use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
 
 use crate::app::SolanumApplication;
@@ -48,6 +51,7 @@ use crate::timer::Timer;
 // is the default look, set in style.css without a class.
 static TIMER_FONT_STYLES: &[&str] = &["serif", "mono"];
 
+#[cfg(feature = "rain")]
 static RAIN_SCRIPT_PATH: &str = "/org/gnome/Solanum/rain/raindrop-fx.js";
 static RAIN_IMAGE_PATH: &str = "/org/gnome/Solanum/rain/background.jpg";
 
@@ -59,6 +63,7 @@ static BACKGROUND_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp"];
 // image blurred behind it. @SCRIPT@ and @BACKGROUND@ are filled in at runtime;
 // the image is passed as a data: URI so WebGL can use it as a texture without
 // any file access from the page.
+#[cfg(feature = "rain")]
 static RAIN_HTML: &str = r##"<!DOCTYPE html>
 <html>
 <head>
@@ -200,7 +205,8 @@ mod imp {
         pub huge_text_bp: TemplateChild<libadwaita::Breakpoint>,
         #[template_child]
         pub rain_box: TemplateChild<gtk::Box>,
-        pub rain_view: RefCell<Option<webkit6::WebView>>,
+        pub rain_view: RefCell<Option<gtk::Widget>>,
+        #[cfg(feature = "rain")]
         pub rain_session: OnceCell<webkit6::NetworkSession>,
         pub rain_sound: RefCell<Option<RainSound>>,
         pub timer_font_provider: RefCell<Option<gtk::CssProvider>>,
@@ -228,6 +234,7 @@ mod imp {
                 huge_text_bp: TemplateChild::default(),
                 rain_box: TemplateChild::default(),
                 rain_view: RefCell::new(None),
+                #[cfg(feature = "rain")]
                 rain_session: OnceCell::new(),
                 rain_sound: RefCell::new(None),
                 timer_font_provider: RefCell::new(None),
@@ -685,9 +692,19 @@ impl SolanumWindow {
             return;
         }
 
-        let Some(html) = Self::rain_html(&settings.string("rain-image")) else {
+        let Some(view) = self.new_rain_view(&settings.string("rain-image")) else {
             return;
         };
+
+        imp.rain_box.append(&view);
+        imp.rain_view.replace(Some(view));
+        self.add_css_class("rainy");
+    }
+
+    // The animated rain: raindrop-fx in a WebKit view.
+    #[cfg(feature = "rain")]
+    fn new_rain_view(&self, image_path: &str) -> Option<gtk::Widget> {
+        let html = Self::rain_html(image_path)?;
 
         let web_settings = webkit6::Settings::new();
         web_settings.set_enable_webgl(true);
@@ -696,7 +713,8 @@ impl SolanumWindow {
 
         // An ephemeral session keeps WebKit from writing caches and storage
         // next to our own data in $XDG_DATA_HOME/solanum.
-        let session = imp
+        let session = self
+            .imp()
             .rain_session
             .get_or_init(webkit6::NetworkSession::new_ephemeral);
 
@@ -713,9 +731,38 @@ impl SolanumWindow {
         view.set_background_color(&gdk::RGBA::BLACK);
         view.load_html(&html, None);
 
-        imp.rain_box.append(&view);
-        imp.rain_view.replace(Some(view));
-        self.add_css_class("rainy");
+        Some(view.upcast())
+    }
+
+    // Without WebKit (as on macOS) the background is the same image as a
+    // still, under the same shade as the rain page (.rain-shade in
+    // style.css) so the labels read as well.
+    #[cfg(not(feature = "rain"))]
+    fn new_rain_view(&self, image_path: &str) -> Option<gtk::Widget> {
+        let (image, _) = Self::rain_image(image_path)?;
+        let texture = match gdk::Texture::from_bytes(&glib::Bytes::from_owned(image)) {
+            Ok(texture) => texture,
+            Err(err) => {
+                glib::g_warning!("solanum", "Could not show the background: {}", err);
+                return None;
+            }
+        };
+
+        let picture = gtk::Picture::builder()
+            .paintable(&texture)
+            .content_fit(gtk::ContentFit::Cover)
+            .hexpand(true)
+            .vexpand(true)
+            .build();
+        let shade = gtk::Box::builder().css_classes(["rain-shade"]).build();
+
+        let view = gtk::Overlay::builder().child(&picture).build();
+        view.add_overlay(&shade);
+        // The view is only decoration: clicks and keys belong to the timer.
+        view.set_can_focus(false);
+        view.set_can_target(false);
+
+        Some(view.upcast())
     }
 
     fn setup_timer_font(&self) {
@@ -786,6 +833,7 @@ impl SolanumWindow {
         imp.timer_font_provider.replace(Some(provider));
     }
 
+    #[cfg(feature = "rain")]
     fn rain_html(image_path: &str) -> Option<String> {
         let script =
             match gio::resources_lookup_data(RAIN_SCRIPT_PATH, gio::ResourceLookupFlags::NONE) {

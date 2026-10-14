@@ -9,7 +9,13 @@ glib-macros = "0.19"
 gstreamer = "0.23"
 gstreamer-play = "0.23"
 libadwaita = { version = "0.7", features = ["v1_5"] }
-webkit6 = "0.4"
+webkit6 = { version = "0.4", optional = true }
+
+[features]
+default = ["rain"]
+# The animated rain background, a WebKitGTK view. Without it the chosen
+# background is shown as a still image (WebKitGTK is not available on macOS).
+rain = ["dep:webkit6"]
 
 [dependencies.gtk]
 version = "0.9"

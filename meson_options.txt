@@ -7,3 +7,10 @@ option(
   ],
   value: 'default'
 )
+
+option(
+  'rain',
+  type: 'feature',
+  value: 'auto',
+  description: 'Animated rain background (needs WebKitGTK 6.0); without it the background is a still image'
+)

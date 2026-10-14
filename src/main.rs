@@ -38,7 +38,9 @@ fn main() -> glib::ExitCode {
     // NVIDIA it rejects WebKit's XR24 buffers) and then copies each frame
     // through the CPU, which costs more than a full core. The GL renderer
     // imports them directly. Set before anything else runs, and only when
-    // the user has not chosen a renderer.
+    // the user has not chosen a renderer. Dmabufs are a Linux matter; other
+    // systems keep GTK's own choice.
+    #[cfg(target_os = "linux")]
     if std::env::var_os("GSK_RENDERER").is_none() {
         std::env::set_var("GSK_RENDERER", "gl");
     }

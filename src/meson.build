@@ -12,6 +12,11 @@ else
   message('Building in debug mode')
 endif
 
+if not webkit_dep.found()
+  cargo_options += [ '--no-default-features' ]
+  message('Building without the animated rain background')
+endif
+
 cargo_env = environment()
 cargo_env.set('CARGO_HOME', meson.project_build_root() / 'cargo-home')
 cargo_env.set('APP_ID', app_id)
