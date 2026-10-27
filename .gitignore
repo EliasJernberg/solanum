@@ -8,3 +8,4 @@ subprojects/blueprint-compiler/
 .flatpak-builder/
 # Screenshots of the design variants, for comparing locally
 design-varianter/
+subprojects/.wraplock
