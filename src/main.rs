@@ -46,6 +46,17 @@ fn main() -> glib::ExitCode {
         std::env::set_var("GSK_RENDERER", "gl");
     }
 
+    // The rain's GLArea asks for desktop OpenGL 3.3, and a GLArea context is
+    // shared with the display's. GTK 4.24 picks OpenGL ES for the display on
+    // NVIDIA (EGL offers both), and a desktop context cannot be shared with
+    // an ES one, so the rain fell back to the still image with "Unable to
+    // create a GL context". Keeping GTK off the ES API makes the whole
+    // window desktop GL. Only when the user has not set GDK_DISABLE.
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("GDK_DISABLE").is_none() {
+        std::env::set_var("GDK_DISABLE", "gles-api");
+    }
+
     // Initiialize gstreamer
     gstreamer::init().expect("Failed to initialize gstreamer");
 
