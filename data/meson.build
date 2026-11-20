@@ -1,5 +1,6 @@
 desktop_conf = configuration_data()
 desktop_conf.set('APP_ID', app_id)
+desktop_conf.set('BINDIR', get_option('prefix') / get_option('bindir'))
 desktop_file = i18n.merge_file(
   input: configure_file(
     input: 'org.gnome.Solanum.desktop.in.in',
