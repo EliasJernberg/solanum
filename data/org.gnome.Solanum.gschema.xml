@@ -34,6 +34,10 @@
       <default>false</default>
       <summary>Whether the window should fullscreen during breaks.</summary>
     </key>
+    <key name="breathing-clock" type="b">
+      <default>true</default>
+      <summary>Whether the paused clock fades slowly in and out. The animation redraws the window every frame.</summary>
+    </key>
     <key name="rain-background" type="b">
       <default>true</default>
       <summary>Whether to show animated raindrops on glass behind the timer.</summary>

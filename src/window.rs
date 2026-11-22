@@ -573,6 +573,27 @@ impl SolanumWindow {
         }
 
         self.update_rain();
+
+        // Without the breathing clock the paused window stays still (style.css).
+        settings.connect_changed(
+            Some("breathing-clock"),
+            clone!(
+                #[weak(rename_to = win)]
+                self,
+                move |settings, key| {
+                    win.set_still(!settings.boolean(key));
+                }
+            ),
+        );
+        self.set_still(!settings.boolean("breathing-clock"));
+    }
+
+    fn set_still(&self, still: bool) {
+        if still {
+            self.add_css_class("still");
+        } else {
+            self.remove_css_class("still");
+        }
     }
 
     // Drop the current rain view, if any, and build a new one when the rain

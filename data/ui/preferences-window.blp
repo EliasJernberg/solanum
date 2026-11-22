@@ -71,6 +71,11 @@ template $SolanumPreferencesWindow : Adw.PreferencesWindow {
       Adw.SwitchRow fullscreen_switch {
         title: _("Fullscreen During Breaks");
       }
+
+      Adw.SwitchRow breathing_switch {
+        title: _("Breathing Clock When Paused");
+        subtitle: _("Turn off to save power: the animation redraws the window every frame");
+      }
     }
 
     Adw.PreferencesGroup {

@@ -53,6 +53,8 @@ mod imp {
         #[template_child]
         pub rain_switch: TemplateChild<libadwaita::SwitchRow>,
         #[template_child]
+        pub breathing_switch: TemplateChild<libadwaita::SwitchRow>,
+        #[template_child]
         pub rain_image_row: TemplateChild<libadwaita::ActionRow>,
         #[template_child]
         pub rain_image_choose_button: TemplateChild<gtk::Button>,
@@ -167,6 +169,9 @@ impl SolanumPreferencesWindow {
             .build();
         settings
             .bind("rain-background", &*imp.rain_switch, "active")
+            .build();
+        settings
+            .bind("breathing-clock", &*imp.breathing_switch, "active")
             .build();
 
         // Show which image is in use: its file name, or "Built-in".

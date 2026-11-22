@@ -83,7 +83,8 @@ button.primary-control {
   animation: breathe 2.6s ease-in-out infinite;
 }
 
-.blinking:backdrop {
+.blinking:backdrop,
+.still .blinking {
   animation: none;
 }
 
